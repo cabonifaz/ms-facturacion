@@ -19,7 +19,7 @@ public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string SistemaOrigen, string IdExterno, string TipoDocumentoCodigo,
     int IdSerieDocumento, DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, string TipoOperacionCodigo,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
-    IReadOnlyList<ItemPeticion> Items);
+    IReadOnlyList<ItemPeticion> Items, string AmbienteCodigo);
 
 public sealed record ActualizarEstadoSunatPeticion(
     string EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
@@ -65,7 +65,24 @@ public sealed class DocumentosElectronicosController(
             peticion.MonedaCodigo, peticion.TipoOperacionCodigo, peticion.FormaPago.Codigo, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 
-        return ResponderSegunEnvelope(resultado);
+        if (resultado.IdTipoMensaje != TipoMensaje.Exito || resultado.Datos is null)
+        {
+            return ResponderSegunEnvelope(resultado);
+        }
+
+        // sendBill (Factura/Boleta) se resuelve de forma síncrona dentro del mismo request, porque SUNAT
+        // devuelve el CDR casi de inmediato para este tipo de documento. sendSummary (resumen/baja) y el
+        // resto de tipos quedan en PendienteEnvio para un envío posterior — eso es Módulo 4 sin terminar
+        // todavía (ver flujo_tablas_microservicio_facturacion_sunat.md, camino híbrido sync/async).
+        if (peticion.TipoDocumentoCodigo is not ("01" or "03"))
+        {
+            return ResponderSegunEnvelope(resultado);
+        }
+
+        var envioSunat = await enviarASunatCasoDeUso.EjecutarAsync(
+            peticion.IdInquilino, resultado.Datos.IdDocumentoElectronico, peticion.AmbienteCodigo, cancellationToken);
+
+        return ResponderInsertarConEnvioSunat(resultado, envioSunat);
     }
 
     [HttpGet("{idDocumentoElectronico:int}")]
@@ -107,6 +124,26 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await enviarASunatCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
+    }
+
+    /// Combina el resultado de Insertar (el documento ya quedó persistido, siempre) con el de enviar-sunat.
+    /// El código HTTP refleja el desenlace de SUNAT, no el de Insertar — pero el cuerpo siempre incluye el
+    /// documento creado, para que el llamador pueda reintentar el envío por separado si SUNAT falló.
+    private IActionResult ResponderInsertarConEnvioSunat(
+        ResultadoOperacion<DocumentoElectronicoCreado> insertado, ResultadoOperacion<ResultadoEnvioSunat> envioSunat)
+    {
+        var cuerpo = new
+        {
+            Documento = insertado.Datos,
+            Sunat = new { envioSunat.Mensaje, Datos = envioSunat.Datos }
+        };
+
+        return envioSunat.IdTipoMensaje switch
+        {
+            TipoMensaje.Exito => Ok(cuerpo),
+            TipoMensaje.ReglaDeNegocio => BadRequest(cuerpo),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, cuerpo)
+        };
     }
 
     private IActionResult ResponderSegunEnvelope<T>(ResultadoOperacion<T> resultado) => resultado.IdTipoMensaje switch
