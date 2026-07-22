@@ -1,8 +1,12 @@
+using ms_facturacion.Aplicacion.CasosDeUso.Certificados;
+using ms_facturacion.Aplicacion.CasosDeUso.ConfiguracionesFacturacionEmpresa;
+using ms_facturacion.Aplicacion.CasosDeUso.Credenciales;
 using ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 using ms_facturacion.Aplicacion.CasosDeUso.Empresas;
 using ms_facturacion.Aplicacion.CasosDeUso.Inquilinos;
 using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 using ms_facturacion.Aplicacion.Puertos;
+using ms_facturacion.Infraestructura.Cifrado;
 using ms_facturacion.Infraestructura.Persistencia;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +22,11 @@ builder.Services.AddScoped<IInquilinoRepositorio, InquilinoRepositorioSql>();
 builder.Services.AddScoped<IEmpresaRepositorio, EmpresaRepositorioSql>();
 builder.Services.AddScoped<ISerieDocumentoRepositorio, SerieDocumentoRepositorioSql>();
 builder.Services.AddScoped<IDocumentoElectronicoRepositorio, DocumentoElectronicoRepositorioSql>();
+builder.Services.AddScoped<ICertificadoRepositorio, CertificadoRepositorioSql>();
+builder.Services.AddScoped<ILlaveCifradoInquilinoRepositorio, LlaveCifradoInquilinoRepositorioSql>();
+builder.Services.AddScoped<ICredencialInquilinoRepositorio, CredencialInquilinoRepositorioSql>();
+builder.Services.AddScoped<IConfiguracionFacturacionEmpresaRepositorio, ConfiguracionFacturacionEmpresaRepositorioSql>();
+builder.Services.AddScoped<ICifradoInquilinoServicio, CifradoInquilinoServicioAesGcm>();
 
 // Casos de Uso — Inquilino
 builder.Services.AddScoped<InsertarInquilinoCasoDeUso>();
@@ -45,6 +54,29 @@ builder.Services.AddScoped<InsertarDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
+
+// Casos de Uso — Certificado
+builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();
+builder.Services.AddScoped<ObtenerCertificadoCasoDeUso>();
+builder.Services.AddScoped<ListarCertificadosCasoDeUso>();
+builder.Services.AddScoped<ActualizarCertificadoCasoDeUso>();
+builder.Services.AddScoped<EliminarCertificadoCasoDeUso>();
+
+// Casos de Uso — Credencial
+builder.Services.AddScoped<InsertarCredencialCasoDeUso>();
+builder.Services.AddScoped<ObtenerCredencialCasoDeUso>();
+builder.Services.AddScoped<ListarCredencialesCasoDeUso>();
+builder.Services.AddScoped<ActualizarCredencialCasoDeUso>();
+builder.Services.AddScoped<EliminarCredencialCasoDeUso>();
+builder.Services.AddScoped<DescifrarCredencialPorTipoCasoDeUso>();
+
+// Casos de Uso — ConfiguracionFacturacionEmpresa
+builder.Services.AddScoped<InsertarConfiguracionFacturacionEmpresaCasoDeUso>();
+builder.Services.AddScoped<ObtenerConfiguracionFacturacionEmpresaCasoDeUso>();
+builder.Services.AddScoped<ObtenerConfiguracionFacturacionEmpresaPorAmbienteCasoDeUso>();
+builder.Services.AddScoped<ListarConfiguracionesFacturacionEmpresaCasoDeUso>();
+builder.Services.AddScoped<ActualizarConfiguracionFacturacionEmpresaCasoDeUso>();
+builder.Services.AddScoped<EliminarConfiguracionFacturacionEmpresaCasoDeUso>();
 
 var app = builder.Build();
 
