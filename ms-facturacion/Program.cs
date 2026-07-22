@@ -35,7 +35,7 @@ builder.Services.AddScoped<ITransmisionSunatRepositorio, TransmisionSunatReposit
 builder.Services.AddScoped<IErrorDocumentoRepositorio, ErrorDocumentoRepositorioSql>();
 
 // Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
-builder.Services.AddScoped<IConstructorXmlFacturaServicio, ConstructorXmlFacturaServicio>();
+builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlComprobanteServicio>();
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
 builder.Services.AddScoped<IEmpaquetadorZipServicio, EmpaquetadorZipServicio>();

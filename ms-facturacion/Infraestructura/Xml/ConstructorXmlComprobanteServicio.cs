@@ -4,26 +4,47 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Infraestructura.Xml;
 
-/// Construye el Invoice UBL 2.1 sin firmar para Factura/Boleta (01/03) — sigue el template exacto de
-/// facturacion/payload_input_output_sunat.md §2.
+/// Construye el UBL 2.1 sin firmar para Factura/Boleta (01/03 → Invoice) y Nota de Crédito/Débito
+/// (07 → CreditNote, 08 → DebitNote) — comparten casi toda la estructura (proveedor, cliente, forma de
+/// pago, totales, líneas); solo cambian el elemento raíz, el nombre de la línea/cantidad, el nombre del
+/// total monetario (DebitNote usa RequestedMonetaryTotal, no LegalMonetaryTotal — quirk real de UBL 2.1),
+/// y que 07/08 agregan cac:DiscrepancyResponse + cac:BillingReference en vez de cbc:InvoiceTypeCode.
 ///
 /// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo por separado; se deriva de si el documento
 /// tiene cuotas (Credito) o no (Contado) — ver Detalle.Cuotas. Es una limitación conocida del esquema
 /// actual, no un error de este constructor.
-public sealed class ConstructorXmlFacturaServicio : IConstructorXmlFacturaServicio
+public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComprobanteServicio
 {
-    private static readonly XNamespace Ubl = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2";
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
     private static readonly XNamespace Cbc = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
     private static readonly XNamespace Ds = "http://www.w3.org/2000/09/xmldsig#";
     private static readonly XNamespace Ext = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
+
+    private sealed record TipoComprobante(
+        XNamespace RaizNs, string ElementoRaiz, string ElementoLinea, string ElementoCantidad, string ElementoTotalMonetario);
+
+    private static readonly Dictionary<string, TipoComprobante> TiposComprobante = new()
+    {
+        ["01"] = new TipoComprobante("urn:oasis:names:specification:ubl:schema:xsd:Invoice-2", "Invoice", "InvoiceLine", "InvoicedQuantity", "LegalMonetaryTotal"),
+        ["03"] = new TipoComprobante("urn:oasis:names:specification:ubl:schema:xsd:Invoice-2", "Invoice", "InvoiceLine", "InvoicedQuantity", "LegalMonetaryTotal"),
+        ["07"] = new TipoComprobante("urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2", "CreditNote", "CreditNoteLine", "CreditedQuantity", "LegalMonetaryTotal"),
+        ["08"] = new TipoComprobante("urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2", "DebitNote", "DebitNoteLine", "DebitedQuantity", "RequestedMonetaryTotal"),
+    };
 
     public byte[] Construir(DocumentoElectronicoDetalle documento, Empresa empresa)
     {
         var cabecera = documento.Cabecera;
         var moneda = cabecera.MonedaCodigo;
 
-        var invoice = new XElement(Ubl + "Invoice",
+        if (!TiposComprobante.TryGetValue(cabecera.TipoDocumentoCodigo, out var tipo))
+        {
+            throw new NotSupportedException(
+                $"El constructor de XML todavía no soporta TipoDocumentoCodigo '{cabecera.TipoDocumentoCodigo}'.");
+        }
+
+        var esNota = cabecera.TipoDocumentoCodigo is "07" or "08";
+
+        var raiz = new XElement(tipo.RaizNs + tipo.ElementoRaiz,
             new XAttribute(XNamespace.Xmlns + "cac", Cac.NamespaceName),
             new XAttribute(XNamespace.Xmlns + "cbc", Cbc.NamespaceName),
             new XAttribute(XNamespace.Xmlns + "ds", Ds.NamespaceName),
@@ -37,28 +58,63 @@ public sealed class ConstructorXmlFacturaServicio : IConstructorXmlFacturaServic
             new XElement(Cbc + "CustomizationID", "2.0"),
             new XElement(Cbc + "ID", $"{cabecera.Serie}-{cabecera.Correlativo}"),
             new XElement(Cbc + "IssueDate", cabecera.FechaEmision.ToString("yyyy-MM-dd")),
-            new XElement(Cbc + "IssueTime", cabecera.HoraEmision.ToString("HH:mm:ss")),
-            new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo),
-            new XElement(Cbc + "DocumentCurrencyCode", moneda),
+            new XElement(Cbc + "IssueTime", cabecera.HoraEmision.ToString("HH:mm:ss")));
 
+        if (esNota)
+        {
+            if (documento.Referencia is null)
+            {
+                throw new InvalidOperationException(
+                    "El documento es una nota de crédito/débito pero no tiene REFERENCIAS_DOCUMENTO_ELECTRONICO asociada.");
+            }
+
+            raiz.Add(ConstruirDiscrepancyResponse(documento.Referencia));
+        }
+        else
+        {
+            raiz.Add(new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo));
+        }
+
+        raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));
+
+        if (esNota)
+        {
+            raiz.Add(ConstruirBillingReference(documento.Referencia!));
+        }
+
+        raiz.Add(
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
             ConstruirFormaPago(documento.Cuotas, cabecera.TotalImporte, moneda),
             ConstruirTaxTotal(cabecera, moneda),
-            ConstruirLegalMonetaryTotal(cabecera, moneda));
+            ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
         foreach (var linea in documento.Lineas)
         {
-            invoice.Add(ConstruirLinea(linea, moneda));
+            raiz.Add(ConstruirLinea(tipo.ElementoLinea, tipo.ElementoCantidad, linea, moneda));
         }
 
-        var xDocument = new XDocument(new XDeclaration("1.0", "UTF-8", null), invoice);
+        var xDocument = new XDocument(new XDeclaration("1.0", "UTF-8", null), raiz);
 
         using var memoria = new MemoryStream();
         xDocument.Save(memoria);
         return memoria.ToArray();
     }
+
+    /// Catálogo N.° 09 (motivo de nota de crédito) va en cbc:ResponseCode; la descripción en cbc:Description
+    /// (Anexo VII, num. 6-7). El documento afectado se referencia por separado en cac:BillingReference.
+    private XElement ConstruirDiscrepancyResponse(ReferenciaDocumentoElectronico referencia) =>
+        new(Cac + "DiscrepancyResponse",
+            new XElement(Cbc + "ReferenceID", $"{referencia.SerieRelacionada}-{referencia.CorrelativoRelacionado}"),
+            new XElement(Cbc + "ResponseCode", referencia.MotivoCodigo),
+            new XElement(Cbc + "Description", referencia.MotivoDescripcion));
+
+    private XElement ConstruirBillingReference(ReferenciaDocumentoElectronico referencia) =>
+        new(Cac + "BillingReference",
+            new XElement(Cac + "InvoiceDocumentReference",
+                new XElement(Cbc + "ID", $"{referencia.SerieRelacionada}-{referencia.CorrelativoRelacionado}"),
+                new XElement(Cbc + "DocumentTypeCode", referencia.TipoDocumentoRelacionadoCodigo)));
 
     private XElement ConstruirFirma(string ruc, string razonSocial) =>
         new(Cac + "Signature",
@@ -147,20 +203,22 @@ public sealed class ConstructorXmlFacturaServicio : IConstructorXmlFacturaServic
                         new XElement(Cbc + "Name", "IGV"),
                         new XElement(Cbc + "TaxTypeCode", "VAT")))));
 
-    private XElement ConstruirLegalMonetaryTotal(DocumentoElectronico cabecera, string moneda)
+    /// Nombre del elemento varía por tipo: LegalMonetaryTotal (Invoice/CreditNote) vs RequestedMonetaryTotal
+    /// (DebitNote) — mismos hijos en los tres casos.
+    private XElement ConstruirTotalMonetario(string elementoTotalMonetario, DocumentoElectronico cabecera, string moneda)
     {
         var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalGratuito;
 
-        return new XElement(Cac + "LegalMonetaryTotal",
+        return new XElement(Cac + elementoTotalMonetario,
             new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), lineExtensionAmount.ToString("F2")),
             new XElement(Cbc + "TaxInclusiveAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2")),
             new XElement(Cbc + "PayableAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2")));
     }
 
-    private XElement ConstruirLinea(LineaDocumentoElectronico linea, string moneda) =>
-        new(Cac + "InvoiceLine",
+    private XElement ConstruirLinea(string elementoLinea, string elementoCantidad, LineaDocumentoElectronico linea, string moneda) =>
+        new(Cac + elementoLinea,
             new XElement(Cbc + "ID", linea.NumeroLinea),
-            new XElement(Cbc + "InvoicedQuantity", new XAttribute("unitCode", linea.UnidadMedidaCodigo), linea.Cantidad),
+            new XElement(Cbc + elementoCantidad, new XAttribute("unitCode", linea.UnidadMedidaCodigo), linea.Cantidad),
             new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), linea.ValorLinea.ToString("F2")),
             new XElement(Cac + "PricingReference",
                 new XElement(Cac + "AlternativeConditionPrice",

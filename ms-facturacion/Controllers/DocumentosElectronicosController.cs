@@ -70,11 +70,12 @@ public sealed class DocumentosElectronicosController(
             return ResponderSegunEnvelope(resultado);
         }
 
-        // sendBill (Factura/Boleta) se resuelve de forma síncrona dentro del mismo request, porque SUNAT
-        // devuelve el CDR casi de inmediato para este tipo de documento. sendSummary (resumen/baja) y el
-        // resto de tipos quedan en PendienteEnvio para un envío posterior — eso es Módulo 4 sin terminar
-        // todavía (ver flujo_tablas_microservicio_facturacion_sunat.md, camino híbrido sync/async).
-        if (peticion.TipoDocumentoCodigo is not ("01" or "03"))
+        // sendBill (Factura/Boleta/Nota de Crédito/Nota de Débito) se resuelve de forma síncrona dentro
+        // del mismo request, porque SUNAT devuelve el CDR casi de inmediato para estos tipos. sendSummary
+        // (resumen/baja) y el resto de tipos quedan en PendienteEnvio para un envío posterior — eso es
+        // Módulo 4 sin terminar todavía (ver flujo_tablas_microservicio_facturacion_sunat.md, camino
+        // híbrido sync/async).
+        if (peticion.TipoDocumentoCodigo is not ("01" or "03" or "07" or "08"))
         {
             return ResponderSegunEnvelope(resultado);
         }
@@ -117,7 +118,7 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
-    // Módulo 4 (Worker): dispara el camino síncrono sendBill (Factura/Boleta) para un documento en PendienteEnvio/Error.
+    // Módulo 4 (Worker): dispara el camino síncrono sendBill (Factura/Boleta/Nota de Crédito/Nota de Débito) para un documento en PendienteEnvio/Error.
     [HttpPost("{idDocumentoElectronico:int}/enviar-sunat")]
     public async Task<IActionResult> EnviarASunat(
         [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string ambienteCodigo, CancellationToken cancellationToken)

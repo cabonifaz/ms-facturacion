@@ -5,17 +5,18 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 
-/// Orquesta el camino síncrono sendBill para Factura/Boleta (01/03): construir XML, firmar, empaquetar,
-/// enviar a SUNAT, interpretar el CDR y reflejar el estado final. Depende solo de Puertos (nunca de otros
-/// Casos de Uso, por AGENTS.md) — cada paso que ya tiene su propio Caso de Uso (Obtener, Descifrar,
-/// ActualizarEstadoSunat) se resuelve aquí llamando directamente al Puerto subyacente.
+/// Orquesta el camino síncrono sendBill para Factura/Boleta (01/03) y Nota de Crédito/Débito (07/08):
+/// construir XML, firmar, empaquetar, enviar a SUNAT, interpretar el CDR y reflejar el estado final.
+/// Depende solo de Puertos (nunca de otros Casos de Uso, por AGENTS.md) — cada paso que ya tiene su propio
+/// Caso de Uso (Obtener, Descifrar, ActualizarEstadoSunat) se resuelve aquí llamando directamente al
+/// Puerto subyacente.
 public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     IDocumentoElectronicoRepositorio documentoRepositorio,
     IEmpresaRepositorio empresaRepositorio,
     IConfiguracionFacturacionEmpresaRepositorio configuracionRepositorio,
     ICredencialInquilinoRepositorio credencialRepositorio,
     ICifradoInquilinoServicio cifradoServicio,
-    IConstructorXmlFacturaServicio constructorXml,
+    IConstructorXmlComprobanteServicio constructorXml,
     IFirmadorXmlServicio firmador,
     IProveedorCertificadoServicio proveedorCertificado,
     IEmpaquetadorZipServicio empaquetador,
@@ -25,7 +26,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     ISunatBillServiceCliente sunatCliente,
     IErrorDocumentoRepositorio errorRepositorio)
 {
-    private static readonly string[] TiposDocumentoSoportados = ["01", "03"];
+    private static readonly string[] TiposDocumentoSoportados = ["01", "03", "07", "08"];
     private const string UsuarioWorker = "ms-facturacion-worker";
 
     public async Task<ResultadoOperacion<ResultadoEnvioSunat>> EjecutarAsync(
@@ -42,7 +43,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         if (!TiposDocumentoSoportados.Contains(cabecera.TipoDocumentoCodigo))
         {
             return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
-                "El Worker todavía no soporta el envío síncrono para este tipo de documento (solo Factura/Boleta por ahora).");
+                "El Worker todavía no soporta el envío síncrono para este tipo de documento (solo Factura/Boleta/Nota de Crédito/Nota de Débito por ahora).");
         }
 
         if (cabecera.EstadoCodigo is not ("PendienteEnvio" or "Error"))
