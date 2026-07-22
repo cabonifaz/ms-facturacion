@@ -30,7 +30,8 @@ public sealed class DocumentosElectronicosController(
     InsertarDocumentoElectronicoCasoDeUso insertarCasoDeUso,
     ObtenerDocumentoElectronicoCasoDeUso obtenerCasoDeUso,
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
-    ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso) : ControllerBase
+    ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
+    EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
     private const string UsuarioEjecutor = "ms-facturacion";
@@ -96,6 +97,15 @@ public sealed class DocumentosElectronicosController(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.EstadoCodigo, peticion.SunatHash,
             peticion.SunatCodigoRespuesta, peticion.SunatDescripcionRespuesta, peticion.SunatTicket, cancellationToken);
 
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Módulo 4 (Worker): dispara el camino síncrono sendBill (Factura/Boleta) para un documento en PendienteEnvio/Error.
+    [HttpPost("{idDocumentoElectronico:int}/enviar-sunat")]
+    public async Task<IActionResult> EnviarASunat(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string ambienteCodigo, CancellationToken cancellationToken)
+    {
+        var resultado = await enviarASunatCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

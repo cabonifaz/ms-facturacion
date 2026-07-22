@@ -6,8 +6,11 @@ using ms_facturacion.Aplicacion.CasosDeUso.Empresas;
 using ms_facturacion.Aplicacion.CasosDeUso.Inquilinos;
 using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 using ms_facturacion.Aplicacion.Puertos;
+using ms_facturacion.Infraestructura.Almacenamiento;
 using ms_facturacion.Infraestructura.Cifrado;
 using ms_facturacion.Infraestructura.Persistencia;
+using ms_facturacion.Infraestructura.Sunat;
+using ms_facturacion.Infraestructura.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +30,17 @@ builder.Services.AddScoped<ILlaveCifradoInquilinoRepositorio, LlaveCifradoInquil
 builder.Services.AddScoped<ICredencialInquilinoRepositorio, CredencialInquilinoRepositorioSql>();
 builder.Services.AddScoped<IConfiguracionFacturacionEmpresaRepositorio, ConfiguracionFacturacionEmpresaRepositorioSql>();
 builder.Services.AddScoped<ICifradoInquilinoServicio, CifradoInquilinoServicioAesGcm>();
+builder.Services.AddScoped<IArchivoDocumentoRepositorio, ArchivoDocumentoRepositorioSql>();
+builder.Services.AddScoped<ITransmisionSunatRepositorio, TransmisionSunatRepositorioSql>();
+builder.Services.AddScoped<IErrorDocumentoRepositorio, ErrorDocumentoRepositorioSql>();
+
+// Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
+builder.Services.AddScoped<IConstructorXmlFacturaServicio, ConstructorXmlFacturaServicio>();
+builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
+builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
+builder.Services.AddScoped<IEmpaquetadorZipServicio, EmpaquetadorZipServicio>();
+builder.Services.AddScoped<IAlmacenamientoArchivosServicio, AlmacenamientoArchivosLocalServicio>();
+builder.Services.AddHttpClient<ISunatBillServiceCliente, SunatBillServiceCliente>();
 
 // Casos de Uso — Inquilino
 builder.Services.AddScoped<InsertarInquilinoCasoDeUso>();
@@ -54,6 +68,7 @@ builder.Services.AddScoped<InsertarDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 
 // Casos de Uso — Certificado
 builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();
