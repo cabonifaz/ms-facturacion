@@ -1,8 +1,9 @@
 namespace ms_facturacion.Dominio;
 
 /// Datos para abrir un intento de transmisión (SP_TransmisionSunat_Insertar) — solo escritura en este pase.
+/// Exactamente uno de IdDocumentoElectronico/IdLoteDocumento debe venir informado (sendBill vs sendSummary).
 public sealed record NuevaTransmisionSunat(
-    int IdDocumentoElectronico, string TipoProveedorCodigo, string Endpoint, string Metodo,
+    int? IdDocumentoElectronico, int? IdLoteDocumento, string TipoProveedorCodigo, string Endpoint, string Metodo,
     int? IdArchivoSolicitud, int NumeroIntento);
 
 /// Datos para cerrar un intento ya abierto (SP_TransmisionSunat_Actualizar) con el resultado real.

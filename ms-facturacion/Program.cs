@@ -4,6 +4,7 @@ using ms_facturacion.Aplicacion.CasosDeUso.Credenciales;
 using ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 using ms_facturacion.Aplicacion.CasosDeUso.Empresas;
 using ms_facturacion.Aplicacion.CasosDeUso.Inquilinos;
+using ms_facturacion.Aplicacion.CasosDeUso.LotesDocumento;
 using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 using ms_facturacion.Aplicacion.Puertos;
 using ms_facturacion.Infraestructura.Almacenamiento;
@@ -33,14 +34,18 @@ builder.Services.AddScoped<ICifradoInquilinoServicio, CifradoInquilinoServicioAe
 builder.Services.AddScoped<IArchivoDocumentoRepositorio, ArchivoDocumentoRepositorioSql>();
 builder.Services.AddScoped<ITransmisionSunatRepositorio, TransmisionSunatRepositorioSql>();
 builder.Services.AddScoped<IErrorDocumentoRepositorio, ErrorDocumentoRepositorioSql>();
+builder.Services.AddScoped<ILoteDocumentoRepositorio, LoteDocumentoRepositorioSql>();
+builder.Services.AddScoped<IItemLoteDocumentoRepositorio, ItemLoteDocumentoRepositorioSql>();
 
 // Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
 builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlComprobanteServicio>();
+builder.Services.AddScoped<IConstructorXmlBajaServicio, ConstructorXmlBajaServicio>();
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
 builder.Services.AddScoped<IEmpaquetadorZipServicio, EmpaquetadorZipServicio>();
 builder.Services.AddScoped<IAlmacenamientoArchivosServicio, AlmacenamientoArchivosLocalServicio>();
 builder.Services.AddHttpClient<ISunatBillServiceCliente, SunatBillServiceCliente>();
+builder.Services.AddHttpClient<ISunatSummaryServiceCliente, SunatSummaryServiceCliente>();
 
 // Casos de Uso — Inquilino
 builder.Services.AddScoped<InsertarInquilinoCasoDeUso>();
@@ -92,6 +97,10 @@ builder.Services.AddScoped<ObtenerConfiguracionFacturacionEmpresaPorAmbienteCaso
 builder.Services.AddScoped<ListarConfiguracionesFacturacionEmpresaCasoDeUso>();
 builder.Services.AddScoped<ActualizarConfiguracionFacturacionEmpresaCasoDeUso>();
 builder.Services.AddScoped<EliminarConfiguracionFacturacionEmpresaCasoDeUso>();
+
+// Casos de Uso — LoteDocumento (Comunicación de Baja)
+builder.Services.AddScoped<EnviarComunicacionBajaASunatCasoDeUso>();
+builder.Services.AddScoped<ConsultarTicketComunicacionBajaCasoDeUso>();
 
 var app = builder.Build();
 

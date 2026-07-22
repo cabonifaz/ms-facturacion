@@ -107,7 +107,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
         var nuevaTransmision = new NuevaTransmisionSunat(
-            cabecera.IdDocumentoElectronico, configuracion.Datos.TipoProveedorCodigo,
+            cabecera.IdDocumentoElectronico, null, configuracion.Datos.TipoProveedorCodigo,
             configuracion.Datos.UrlEnvioFacturaBoletaNota, "sendBill", idArchivoZip, 1);
 
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);

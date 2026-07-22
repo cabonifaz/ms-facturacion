@@ -23,7 +23,8 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
 
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", transmision.IdDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", (object?)transmision.IdDocumentoElectronico ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdLoteDocumento", (object?)transmision.IdLoteDocumento ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchTipoProveedorCodigo", transmision.TipoProveedorCodigo);
             comando.Parameters.AddWithValue("@vchEndpoint", transmision.Endpoint);
             comando.Parameters.AddWithValue("@vchMetodo", transmision.Metodo);
