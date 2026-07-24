@@ -152,7 +152,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         {
             registrationAddress.Add(new XElement(Cac + "AddressLine", new XElement(Cbc + "Line", cabecera.ClienteDireccion)));
         }
-        registrationAddress.Add(new XElement(Cac + "Country", new XElement(Cbc + "IdentificationCode", "PE")));
+        registrationAddress.Add(new XElement(Cac + "Country", new XElement(Cbc + "IdentificationCode", cabecera.ClientePaisCodigo)));
 
         return new XElement(Cac + "AccountingCustomerParty",
             new XElement(Cac + "Party",

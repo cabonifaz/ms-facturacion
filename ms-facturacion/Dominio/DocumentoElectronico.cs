@@ -27,6 +27,7 @@ public sealed class DocumentoElectronico
     public required string ClienteNombre { get; init; }
     public string? ClienteDireccion { get; init; }
     public string? ClienteCorreo { get; init; }
+    public required string ClientePaisCodigo { get; init; }
 
     public required decimal TotalGravado { get; init; }
     public required decimal TotalInafecto { get; init; }

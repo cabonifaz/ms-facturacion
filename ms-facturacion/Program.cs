@@ -74,6 +74,12 @@ builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
+builder.Services.AddScoped<AgregarLineaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ActualizarLineaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<EliminarLineaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<AgregarCuotaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ActualizarCuotaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<EliminarCuotaDocumentoElectronicoCasoDeUso>();
 
 // Casos de Uso — Certificado
 builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();

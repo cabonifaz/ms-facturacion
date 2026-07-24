@@ -22,4 +22,32 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> ActualizarEstadoSunatAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<LineaDocumentoElectronico>> AgregarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<LineaDocumentoElectronico>> ActualizarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<bool>> EliminarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<CuotaDocumentoElectronico>> AgregarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
+        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<bool>> EliminarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
+        CancellationToken cancellationToken);
 }

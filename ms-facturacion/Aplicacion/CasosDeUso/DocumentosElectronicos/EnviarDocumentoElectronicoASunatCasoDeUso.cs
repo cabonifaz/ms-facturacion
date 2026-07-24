@@ -52,6 +52,37 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
                 $"El documento ya fue procesado (estado actual: {cabecera.EstadoCodigo}).");
         }
 
+        // DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo (ver ConstructorXmlComprobanteServicio): que
+        // haya cuotas ya significa Crédito. Como ahora las cuotas/líneas se editan de a una después de
+        // Guardar, el balance pudo quedar temporalmente desincronizado — se valida recién aquí, al confirmar.
+        if (documento.Datos.Cuotas.Count > 0)
+        {
+            var totalCuotas = documento.Datos.Cuotas.Sum(c => c.Monto);
+            if (Math.Round(totalCuotas, 2) != Math.Round(cabecera.TotalImporte, 2))
+            {
+                return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
+                    "La suma de las cuotas no coincide con el total del documento. Corrija las cuotas antes de confirmar con SUNAT.");
+            }
+        }
+
+        // El borrador guarda una FechaEmision/HoraEmision inicial, pero la emisión real ocurre recién
+        // ahora — se recalcula al momento de confirmar, no al guardar.
+        var ahora = DateTime.Now;
+        var actualizacionFecha = await documentoRepositorio.ActualizarFechaEmisionAsync(
+            UsuarioWorker, idInquilino, idDocumentoElectronico,
+            DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), cancellationToken);
+        if (actualizacionFecha.IdTipoMensaje != TipoMensaje.Exito)
+        {
+            return new ResultadoOperacion<ResultadoEnvioSunat>(actualizacionFecha.IdTipoMensaje, actualizacionFecha.Mensaje, default);
+        }
+
+        documento = await documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        if (documento.IdTipoMensaje != TipoMensaje.Exito || documento.Datos is null)
+        {
+            return new ResultadoOperacion<ResultadoEnvioSunat>(documento.IdTipoMensaje, documento.Mensaje, default);
+        }
+        cabecera = documento.Datos.Cabecera;
+
         var empresa = await empresaRepositorio.ObtenerAsync(idInquilino, cabecera.IdEmpresa, cancellationToken);
         if (empresa.IdTipoMensaje != TipoMensaje.Exito || empresa.Datos is null)
         {

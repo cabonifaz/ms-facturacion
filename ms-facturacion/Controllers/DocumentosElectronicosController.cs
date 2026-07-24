@@ -19,10 +19,19 @@ public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string SistemaOrigen, string IdExterno, string TipoDocumentoCodigo,
     int IdSerieDocumento, DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, string TipoOperacionCodigo,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
-    IReadOnlyList<ItemPeticion> Items, string AmbienteCodigo);
+    IReadOnlyList<ItemPeticion> Items);
 
 public sealed record ActualizarEstadoSunatPeticion(
     string EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
+
+/// Igual a ItemPeticion pero sin NumeroLinea — lo asigna el SP (MAX(NumeroLinea)+1) al agregar/actualizar.
+public sealed record LineaPeticion(
+    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
+    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
+    string AfectacionIgvCodigo, decimal PorcentajeIgv);
+
+/// Igual a CuotaPeticion pero sin NumeroCuota — lo asigna el SP (MAX(NumeroCuota)+1) al agregar.
+public sealed record CuotaEdicionPeticion(DateOnly FechaVencimiento, decimal Monto);
 
 [ApiController]
 [Route("api/v1/documentos-electronicos")]
@@ -31,7 +40,13 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoCasoDeUso obtenerCasoDeUso,
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
-    EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso) : ControllerBase
+    EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
+    AgregarLineaDocumentoElectronicoCasoDeUso agregarLineaCasoDeUso,
+    ActualizarLineaDocumentoElectronicoCasoDeUso actualizarLineaCasoDeUso,
+    EliminarLineaDocumentoElectronicoCasoDeUso eliminarLineaCasoDeUso,
+    AgregarCuotaDocumentoElectronicoCasoDeUso agregarCuotaCasoDeUso,
+    ActualizarCuotaDocumentoElectronicoCasoDeUso actualizarCuotaCasoDeUso,
+    EliminarCuotaDocumentoElectronicoCasoDeUso eliminarCuotaCasoDeUso) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
     private const string UsuarioEjecutor = "ms-facturacion";
@@ -65,25 +80,75 @@ public sealed class DocumentosElectronicosController(
             peticion.MonedaCodigo, peticion.TipoOperacionCodigo, peticion.FormaPago.Codigo, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 
-        if (resultado.IdTipoMensaje != TipoMensaje.Exito || resultado.Datos is null)
-        {
-            return ResponderSegunEnvelope(resultado);
-        }
+        return ResponderSegunEnvelope(resultado);
+    }
 
-        // sendBill (Factura/Boleta/Nota de Crédito/Nota de Débito) se resuelve de forma síncrona dentro
-        // del mismo request, porque SUNAT devuelve el CDR casi de inmediato para estos tipos. sendSummary
-        // (resumen/baja) y el resto de tipos quedan en PendienteEnvio para un envío posterior — eso es
-        // Módulo 4 sin terminar todavía (ver flujo_tablas_microservicio_facturacion_sunat.md, camino
-        // híbrido sync/async).
-        if (peticion.TipoDocumentoCodigo is not ("01" or "03" or "07" or "08"))
-        {
-            return ResponderSegunEnvelope(resultado);
-        }
+    // "Guardar" deja el documento en PendienteEnvio, editable — agregar/actualizar/quitar líneas y cuotas
+    // mientras no se haya confirmado el envío (ver EnviarASunat, "Confirmar con SUNAT").
+    [HttpPost("{idDocumentoElectronico:int}/lineas")]
+    public async Task<IActionResult> AgregarLinea(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, LineaPeticion peticion, CancellationToken cancellationToken)
+    {
+        var linea = new LineaDocumentoElectronicoEntrada(
+            0, peticion.ProductoCodigo, peticion.ProductoSunatCodigo, peticion.Descripcion, peticion.UnidadMedidaCodigo,
+            peticion.Cantidad, peticion.ValorUnitario, peticion.PrecioUnitario, peticion.MontoDescuento,
+            peticion.AfectacionIgvCodigo, peticion.PorcentajeIgv);
 
-        var envioSunat = await enviarASunatCasoDeUso.EjecutarAsync(
-            peticion.IdInquilino, resultado.Datos.IdDocumentoElectronico, peticion.AmbienteCodigo, cancellationToken);
+        var resultado = await agregarLineaCasoDeUso.EjecutarAsync(UsuarioEjecutor, idInquilino, idDocumentoElectronico, linea, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
 
-        return ResponderInsertarConEnvioSunat(resultado, envioSunat);
+    [HttpPut("{idDocumentoElectronico:int}/lineas/{idLineaDocumentoElectronico:int}")]
+    public async Task<IActionResult> ActualizarLinea(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        LineaPeticion peticion, CancellationToken cancellationToken)
+    {
+        var linea = new LineaDocumentoElectronicoEntrada(
+            0, peticion.ProductoCodigo, peticion.ProductoSunatCodigo, peticion.Descripcion, peticion.UnidadMedidaCodigo,
+            peticion.Cantidad, peticion.ValorUnitario, peticion.PrecioUnitario, peticion.MontoDescuento,
+            peticion.AfectacionIgvCodigo, peticion.PorcentajeIgv);
+
+        var resultado = await actualizarLineaCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idLineaDocumentoElectronico, linea, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    [HttpDelete("{idDocumentoElectronico:int}/lineas/{idLineaDocumentoElectronico:int}")]
+    public async Task<IActionResult> EliminarLinea(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await eliminarLineaCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idLineaDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    [HttpPost("{idDocumentoElectronico:int}/cuotas")]
+    public async Task<IActionResult> AgregarCuota(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CuotaEdicionPeticion peticion, CancellationToken cancellationToken)
+    {
+        var resultado = await agregarCuotaCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.FechaVencimiento, peticion.Monto, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    [HttpPut("{idDocumentoElectronico:int}/cuotas/{idCuotaDocumentoElectronico:int}")]
+    public async Task<IActionResult> ActualizarCuota(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
+        CuotaEdicionPeticion peticion, CancellationToken cancellationToken)
+    {
+        var resultado = await actualizarCuotaCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico,
+            peticion.FechaVencimiento, peticion.Monto, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    [HttpDelete("{idDocumentoElectronico:int}/cuotas/{idCuotaDocumentoElectronico:int}")]
+    public async Task<IActionResult> EliminarCuota(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await eliminarCuotaCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
     }
 
     [HttpGet("{idDocumentoElectronico:int}")]
@@ -125,26 +190,6 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await enviarASunatCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
-    }
-
-    /// Combina el resultado de Insertar (el documento ya quedó persistido, siempre) con el de enviar-sunat.
-    /// El código HTTP refleja el desenlace de SUNAT, no el de Insertar — pero el cuerpo siempre incluye el
-    /// documento creado, para que el llamador pueda reintentar el envío por separado si SUNAT falló.
-    private IActionResult ResponderInsertarConEnvioSunat(
-        ResultadoOperacion<DocumentoElectronicoCreado> insertado, ResultadoOperacion<ResultadoEnvioSunat> envioSunat)
-    {
-        var cuerpo = new
-        {
-            Documento = insertado.Datos,
-            Sunat = new { envioSunat.Mensaje, Datos = envioSunat.Datos }
-        };
-
-        return envioSunat.IdTipoMensaje switch
-        {
-            TipoMensaje.Exito => Ok(cuerpo),
-            TipoMensaje.ReglaDeNegocio => BadRequest(cuerpo),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, cuerpo)
-        };
     }
 
     private IActionResult ResponderSegunEnvelope<T>(ResultadoOperacion<T> resultado) => resultado.IdTipoMensaje switch

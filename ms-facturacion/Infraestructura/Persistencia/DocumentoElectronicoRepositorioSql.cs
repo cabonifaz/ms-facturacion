@@ -42,7 +42,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchClienteCorreo", (object?)cliente.Correo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@chrClientePaisCodigo", "PE");
             comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchTipoReferenciaCodigo", (object?)documentoAfectado?.TipoReferenciaCodigo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchMotivoCodigo", (object?)documentoAfectado?.MotivoCodigo ?? DBNull.Value);
@@ -132,6 +131,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 ClienteNombre = lector.GetString(lector.GetOrdinal("ClienteNombre")),
                 ClienteDireccion = LeerNullableString(lector, "ClienteDireccion"),
                 ClienteCorreo = LeerNullableString(lector, "ClienteCorreo"),
+                ClientePaisCodigo = lector.GetString(lector.GetOrdinal("ClientePaisCodigo")),
                 TotalGravado = lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
                 TotalInafecto = lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
                 TotalExonerado = lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
@@ -158,6 +158,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             while (await lector.ReadAsync(cancellationToken))
             {
                 lineas.Add(new LineaDocumentoElectronico(
+                    lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
                     lector.GetString(lector.GetOrdinal("ProductoCodigo")),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
@@ -199,7 +200,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 cuotas.Add(new CuotaDocumentoElectronico(
                     lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
-                    lector.GetDecimal(lector.GetOrdinal("Monto"))));
+                    lector.GetDecimal(lector.GetOrdinal("Monto")),
+                    lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico"))));
             }
 
             var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas);
@@ -308,6 +310,266 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeErrorSistema(ex.Message);
         }
     }
+
+    public async Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ActualizarFechaEmision", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@dtmFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.Add("@timHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            return idTipoMensaje == TipoMensaje.Exito
+                ? ResultadoOperacion<bool>.DeExito(mensaje, true)
+                : new ResultadoOperacion<bool>(idTipoMensaje, mensaje, default);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<bool>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<LineaDocumentoElectronico>> AgregarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LineaDocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            AgregarParametrosLinea(comando, linea);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<LineaDocumentoElectronico>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            return ResultadoOperacion<LineaDocumentoElectronico>.DeExito(mensaje, LeerLinea(lector));
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<LineaDocumentoElectronico>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<LineaDocumentoElectronico>> ActualizarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LineaDocumentoElectronico_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdLineaDocumentoElectronico", idLineaDocumentoElectronico);
+            AgregarParametrosLinea(comando, linea);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<LineaDocumentoElectronico>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            return ResultadoOperacion<LineaDocumentoElectronico>.DeExito(mensaje, LeerLinea(lector));
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<LineaDocumentoElectronico>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<bool>> EliminarLineaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LineaDocumentoElectronico_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdLineaDocumentoElectronico", idLineaDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            return idTipoMensaje == TipoMensaje.Exito
+                ? ResultadoOperacion<bool>.DeExito(mensaje, true)
+                : new ResultadoOperacion<bool>(idTipoMensaje, mensaje, default);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<bool>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<CuotaDocumentoElectronico>> AgregarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_CuotaDocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@dtmFechaVencimiento", fechaVencimiento.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@decMonto", monto);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<CuotaDocumentoElectronico>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            return ResultadoOperacion<CuotaDocumentoElectronico>.DeExito(mensaje, LeerCuota(lector));
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<CuotaDocumentoElectronico>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
+        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_CuotaDocumentoElectronico_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdCuotaDocumentoElectronico", idCuotaDocumentoElectronico);
+            comando.Parameters.AddWithValue("@dtmFechaVencimiento", fechaVencimiento.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@decMonto", monto);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<CuotaDocumentoElectronico>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            return ResultadoOperacion<CuotaDocumentoElectronico>.DeExito(mensaje, LeerCuota(lector));
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<CuotaDocumentoElectronico>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<bool>> EliminarCuotaAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_CuotaDocumentoElectronico_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdCuotaDocumentoElectronico", idCuotaDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            return idTipoMensaje == TipoMensaje.Exito
+                ? ResultadoOperacion<bool>.DeExito(mensaje, true)
+                : new ResultadoOperacion<bool>(idTipoMensaje, mensaje, default);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<bool>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    private static void AgregarParametrosLinea(SqlCommand comando, LineaDocumentoElectronicoEntrada linea)
+    {
+        comando.Parameters.AddWithValue("@vchProductoCodigo", linea.ProductoCodigo);
+        comando.Parameters.AddWithValue("@vchProductoSunatCodigo", (object?)linea.ProductoSunatCodigo ?? DBNull.Value);
+        comando.Parameters.AddWithValue("@vchDescripcion", linea.Descripcion);
+        comando.Parameters.AddWithValue("@vchUnidadMedidaCodigo", linea.UnidadMedidaCodigo);
+        comando.Parameters.AddWithValue("@decCantidad", linea.Cantidad);
+        comando.Parameters.AddWithValue("@decValorUnitario", linea.ValorUnitario);
+        comando.Parameters.AddWithValue("@decPrecioUnitario", linea.PrecioUnitario);
+        comando.Parameters.AddWithValue("@decMontoDescuento", linea.MontoDescuento);
+        comando.Parameters.AddWithValue("@vchAfectacionIgvCodigo", linea.AfectacionIgvCodigo);
+        comando.Parameters.AddWithValue("@decPorcentajeIgv", linea.PorcentajeIgv);
+    }
+
+    private static LineaDocumentoElectronico LeerLinea(SqlDataReader lector) => new(
+        lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
+        lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+        lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+        LeerNullableString(lector, "ProductoSunatCodigo"),
+        lector.GetString(lector.GetOrdinal("Descripcion")),
+        lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
+        lector.GetDecimal(lector.GetOrdinal("Cantidad")),
+        lector.GetDecimal(lector.GetOrdinal("ValorUnitario")),
+        lector.GetDecimal(lector.GetOrdinal("PrecioUnitario")),
+        lector.GetDecimal(lector.GetOrdinal("MontoDescuento")),
+        lector.GetString(lector.GetOrdinal("AfectacionIgvCodigo")),
+        lector.GetDecimal(lector.GetOrdinal("PorcentajeIgv")),
+        lector.GetDecimal(lector.GetOrdinal("MontoIgv")),
+        lector.GetDecimal(lector.GetOrdinal("MontoIsc")),
+        lector.GetDecimal(lector.GetOrdinal("MontoOtrosTributos")),
+        lector.GetDecimal(lector.GetOrdinal("ValorLinea")),
+        lector.GetDecimal(lector.GetOrdinal("TotalLinea")));
+
+    private static CuotaDocumentoElectronico LeerCuota(SqlDataReader lector) => new(
+        lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
+        DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
+        lector.GetDecimal(lector.GetOrdinal("Monto")),
+        lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")));
 
     /// El orden de columnas debe coincidir exactamente con TVP_LINEA_DOCUMENTO_ELECTRONICO (02_CrearTipos_MsFacturacion.sql) —
     /// una TVP basada en DataTable se mapea posicionalmente, no por nombre.
