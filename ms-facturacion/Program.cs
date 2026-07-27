@@ -1,4 +1,5 @@
 using ms_facturacion.Aplicacion.CasosDeUso.Certificados;
+using ms_facturacion.Aplicacion.CasosDeUso.Clientes;
 using ms_facturacion.Aplicacion.CasosDeUso.ConfiguracionesFacturacionEmpresa;
 using ms_facturacion.Aplicacion.CasosDeUso.Credenciales;
 using ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
@@ -43,6 +44,7 @@ builder.Services.AddSingleton<IAmazonS3>(_ =>
 // Puertos → Adaptadores (Infraestructura)
 builder.Services.AddScoped<IInquilinoRepositorio, InquilinoRepositorioSql>();
 builder.Services.AddScoped<IEmpresaRepositorio, EmpresaRepositorioSql>();
+builder.Services.AddScoped<IClienteRepositorio, ClienteRepositorioSql>();
 builder.Services.AddScoped<ISerieDocumentoRepositorio, SerieDocumentoRepositorioSql>();
 builder.Services.AddScoped<IDocumentoElectronicoRepositorio, DocumentoElectronicoRepositorioSql>();
 builder.Services.AddScoped<ICertificadoRepositorio, CertificadoRepositorioSql>();
@@ -78,6 +80,13 @@ builder.Services.AddScoped<ObtenerEmpresaCasoDeUso>();
 builder.Services.AddScoped<ListarEmpresasCasoDeUso>();
 builder.Services.AddScoped<ActualizarEmpresaCasoDeUso>();
 builder.Services.AddScoped<EliminarEmpresaCasoDeUso>();
+
+// Casos de Uso — Cliente
+builder.Services.AddScoped<InsertarClienteCasoDeUso>();
+builder.Services.AddScoped<ObtenerClienteCasoDeUso>();
+builder.Services.AddScoped<ListarClientesCasoDeUso>();
+builder.Services.AddScoped<ActualizarClienteCasoDeUso>();
+builder.Services.AddScoped<EliminarClienteCasoDeUso>();
 
 // Casos de Uso — SerieDocumento
 builder.Services.AddScoped<InsertarSerieDocumentoCasoDeUso>();
