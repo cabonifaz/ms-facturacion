@@ -32,6 +32,13 @@ Hexagonal (Ports & Adapters) / Clean Architecture, expressed with modern .NET 10
 - Stored procedure names follow `SP_<Verbo><Entidad>` (Spanish, per Naming Conventions), e.g. `SP_ObtenerFacturasPorCliente`.
 - Only the persistence **Adaptador** (the driven adapter implementing a repository **Puerto**) may reference `Microsoft.Data.SqlClient`/ADO.NET or issue stored procedure calls — Casos de Uso and Puertos stay unaware of SQL Server specifics.
 
+### Table Schema
+
+- Every table uses soft delete (`SoftDelete BIT NOT NULL DEFAULT 0`) plus an audit block: `UsuCre`, `FchCre`, `UsuMod`, `FchMod`.
+- `CREATE TABLE` scripts declare **only** the `PRIMARY KEY CLUSTERED` on the identity column. No `FOREIGN KEY`, no `UNIQUE` constraint, no `CREATE INDEX`/`CREATE NONCLUSTERED INDEX`.
+  - No FKs/indexes: relational integrity and query performance are handled at the stored-procedure/app layer, not enforced by SQL Server.
+  - No `UNIQUE` on business keys (RUC, Serie, Código, etc.): because rows are soft-deleted rather than removed, a DB-level `UNIQUE` would block reusing a business key whose only prior row was soft-deleted. Instead, the inserting/updating stored procedure checks for duplicates itself, scoped to `WHERE SoftDelete = 0`.
+
 ### Response Envelope
 
 Every stored procedure follows the same response contract, and the persistence Adaptador must honor it consistently:
