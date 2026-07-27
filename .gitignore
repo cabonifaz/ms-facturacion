@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local secrets (connection string, master encryption key, storage path)
+ms-facturacion/appsettings.json
+
 # User-specific files
 *.rsuser
 *.suo
