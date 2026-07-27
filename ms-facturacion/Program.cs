@@ -12,6 +12,8 @@ using ms_facturacion.Infraestructura.Cifrado;
 using ms_facturacion.Infraestructura.Persistencia;
 using ms_facturacion.Infraestructura.Sunat;
 using ms_facturacion.Infraestructura.Xml;
+using Amazon.Runtime;
+using Amazon.S3;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +22,23 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddMemoryCache();
+
+// AWS S3 — mismo patrón de conexión que maximlian3_backend/SafetyReport.WebApi/Program.cs:
+// credenciales estáticas (AWS:AccessKey/AWS:SecretKey) + región (AWS:Region), un solo IAmazonS3 singleton.
+var awsRegion = builder.Configuration["AWS:Region"]
+    ?? throw new InvalidOperationException("No se configuró 'AWS:Region'.");
+var awsAccessKey = builder.Configuration["AWS:AccessKey"]
+    ?? throw new InvalidOperationException("No se configuró 'AWS:AccessKey'.");
+var awsSecretKey = builder.Configuration["AWS:SecretKey"]
+    ?? throw new InvalidOperationException("No se configuró 'AWS:SecretKey'.");
+
+builder.Services.AddSingleton<IAmazonS3>(_ =>
+{
+    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(awsRegion);
+    var credenciales = new BasicAWSCredentials(awsAccessKey, awsSecretKey);
+    return new AmazonS3Client(credenciales, regionEndpoint);
+});
 
 // Puertos → Adaptadores (Infraestructura)
 builder.Services.AddScoped<IInquilinoRepositorio, InquilinoRepositorioSql>();
@@ -42,7 +61,7 @@ builder.Services.AddScoped<IConstructorXmlBajaServicio, ConstructorXmlBajaServic
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
 builder.Services.AddScoped<IEmpaquetadorZipServicio, EmpaquetadorZipServicio>();
-builder.Services.AddScoped<IAlmacenamientoArchivosServicio, AlmacenamientoArchivosLocalServicio>();
+builder.Services.AddScoped<IAlmacenamientoArchivosServicio, AlmacenamientoArchivosS3Servicio>();
 builder.Services.AddHttpClient<ISunatBillServiceCliente, SunatBillServiceCliente>();
 builder.Services.AddHttpClient<ISunatSummaryServiceCliente, SunatSummaryServiceCliente>();
 

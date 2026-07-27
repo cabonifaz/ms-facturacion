@@ -8,16 +8,19 @@ namespace ms_facturacion.Controllers;
 public sealed record ItemBajaPeticion(int IdDocumentoElectronico, string MotivoDescripcion);
 
 public sealed record ComunicacionBajaPeticion(
-    int IdInquilino, int IdEmpresa, string AmbienteCodigo, DateOnly FechaReferencia, IReadOnlyList<ItemBajaPeticion> Items);
+    int IdInquilino, int IdEmpresa, DateOnly FechaReferencia, IReadOnlyList<ItemBajaPeticion> Items);
 
 [ApiController]
 [Route("api/v1/lotes-documento")]
 public sealed class LotesDocumentoController(
     EnviarComunicacionBajaASunatCasoDeUso enviarBajaCasoDeUso,
-    ConsultarTicketComunicacionBajaCasoDeUso consultarTicketCasoDeUso) : ControllerBase
+    ConsultarTicketComunicacionBajaCasoDeUso consultarTicketCasoDeUso,
+    IHostEnvironment entorno) : ControllerBase
 {
     // Comunicación de Baja: crea el lote y lo envía a SUNAT en el mismo paso — el resultado esperable
     // de éxito es un ticket (sendSummary nunca resuelve en la misma llamada), no un veredicto final.
+    // AmbienteCodigo (Beta/Produccion) se deriva del entorno real del servidor, no de un valor mandado por
+    // el llamador — así una request no puede hacer que esta instancia le pegue al SUNAT equivocado.
     [HttpPost("comunicacion-baja")]
     public async Task<IActionResult> ComunicacionBaja(ComunicacionBajaPeticion peticion, CancellationToken cancellationToken)
     {
@@ -25,8 +28,9 @@ public sealed class LotesDocumentoController(
             .Select(item => new ItemBajaEntrada(item.IdDocumentoElectronico, item.MotivoDescripcion))
             .ToList();
 
+        var ambienteCodigo = entorno.IsProduction() ? "Produccion" : "Beta";
         var resultado = await enviarBajaCasoDeUso.EjecutarAsync(
-            peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, peticion.AmbienteCodigo, cancellationToken);
+            peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, ambienteCodigo, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
@@ -35,8 +39,9 @@ public sealed class LotesDocumentoController(
     // (no hay poller/BackgroundService todavía — fuera de alcance de este pase).
     [HttpPost("{idLoteDocumento:int}/consultar-ticket")]
     public async Task<IActionResult> ConsultarTicket(
-        [FromQuery] int idInquilino, int idLoteDocumento, [FromQuery] string ambienteCodigo, CancellationToken cancellationToken)
+        [FromQuery] int idInquilino, int idLoteDocumento, CancellationToken cancellationToken)
     {
+        var ambienteCodigo = entorno.IsProduction() ? "Produccion" : "Beta";
         var resultado = await consultarTicketCasoDeUso.EjecutarAsync(idInquilino, idLoteDocumento, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
