@@ -165,7 +165,7 @@ public sealed class DocumentosElectronicosController(
     public async Task<IActionResult> EnviarASunat(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
-        var ambienteCodigo = entorno.IsProduction() ? "Produccion" : "Beta";
+        var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await enviarASunatCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
