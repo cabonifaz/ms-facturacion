@@ -16,7 +16,7 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     public async Task<ResultadoOperacion<int>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, string ruc, string razonSocial, string? nombreComercial,
         string direccion, string ubigeo, string departamento, string provincia, string distrito,
-        string paisCodigo, bool activo, CancellationToken cancellationToken)
+        int paisCodigo, bool activo, CancellationToken cancellationToken)
     {
         try
         {
@@ -33,7 +33,7 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
             comando.Parameters.AddWithValue("@vchDepartamento", departamento);
             comando.Parameters.AddWithValue("@vchProvincia", provincia);
             comando.Parameters.AddWithValue("@vchDistrito", distrito);
-            comando.Parameters.AddWithValue("@chrPaisCodigo", paisCodigo);
+            comando.Parameters.AddWithValue("@intPaisCodigo", paisCodigo);
             comando.Parameters.AddWithValue("@bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
@@ -156,7 +156,7 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     public async Task<ResultadoOperacion<int>> ActualizarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string ruc, string razonSocial, string? nombreComercial,
         string direccion, string ubigeo, string departamento, string provincia, string distrito,
-        string paisCodigo, bool activo, CancellationToken cancellationToken)
+        int paisCodigo, bool activo, CancellationToken cancellationToken)
     {
         try
         {
@@ -174,7 +174,7 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
             comando.Parameters.AddWithValue("@vchDepartamento", departamento);
             comando.Parameters.AddWithValue("@vchProvincia", provincia);
             comando.Parameters.AddWithValue("@vchDistrito", distrito);
-            comando.Parameters.AddWithValue("@chrPaisCodigo", paisCodigo);
+            comando.Parameters.AddWithValue("@intPaisCodigo", paisCodigo);
             comando.Parameters.AddWithValue("@bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);

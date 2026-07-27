@@ -4,13 +4,15 @@ using ms_facturacion.Aplicacion.CasosDeUso.Empresas;
 
 namespace ms_facturacion.Controllers;
 
+/// PaisCodigo = Num1 de TABLA_MAESTRA IdMaestro=2 (misma numeración que ya usa maximlian3_backend para
+/// identificar países), no el código ISO — se matchea por id, no por string.
 public sealed record InsertarEmpresaPeticion(
     int IdInquilino, string Ruc, string RazonSocial, string? NombreComercial, string Direccion,
-    string Ubigeo, string Departamento, string Provincia, string Distrito, string PaisCodigo, bool Activo);
+    string Ubigeo, string Departamento, string Provincia, string Distrito, int PaisCodigo, bool Activo);
 
 public sealed record ActualizarEmpresaPeticion(
     string Ruc, string RazonSocial, string? NombreComercial, string Direccion,
-    string Ubigeo, string Departamento, string Provincia, string Distrito, string PaisCodigo, bool Activo);
+    string Ubigeo, string Departamento, string Provincia, string Distrito, int PaisCodigo, bool Activo);
 
 [ApiController]
 [Route("api/v1/empresas")]

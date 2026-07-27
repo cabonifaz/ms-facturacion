@@ -8,7 +8,7 @@ public interface IEmpresaRepositorio
     Task<ResultadoOperacion<int>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, string ruc, string razonSocial, string? nombreComercial,
         string direccion, string ubigeo, string departamento, string provincia, string distrito,
-        string paisCodigo, bool activo, CancellationToken cancellationToken);
+        int paisCodigo, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<Empresa>> ObtenerAsync(
         int idInquilino, int idEmpresa, CancellationToken cancellationToken);
@@ -19,7 +19,7 @@ public interface IEmpresaRepositorio
     Task<ResultadoOperacion<int>> ActualizarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string ruc, string razonSocial, string? nombreComercial,
         string direccion, string ubigeo, string departamento, string provincia, string distrito,
-        string paisCodigo, bool activo, CancellationToken cancellationToken);
+        int paisCodigo, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<int>> EliminarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, CancellationToken cancellationToken);
