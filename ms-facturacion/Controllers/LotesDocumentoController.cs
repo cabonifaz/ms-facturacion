@@ -28,7 +28,7 @@ public sealed class LotesDocumentoController(
             .Select(item => new ItemBajaEntrada(item.IdDocumentoElectronico, item.MotivoDescripcion))
             .ToList();
 
-        var ambienteCodigo = entorno.IsProduction() ? "Produccion" : "Beta";
+        var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await enviarBajaCasoDeUso.EjecutarAsync(
             peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, ambienteCodigo, cancellationToken);
 
@@ -41,7 +41,7 @@ public sealed class LotesDocumentoController(
     public async Task<IActionResult> ConsultarTicket(
         [FromQuery] int idInquilino, int idLoteDocumento, CancellationToken cancellationToken)
     {
-        var ambienteCodigo = entorno.IsProduction() ? "Produccion" : "Beta";
+        var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await consultarTicketCasoDeUso.EjecutarAsync(idInquilino, idLoteDocumento, ambienteCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
