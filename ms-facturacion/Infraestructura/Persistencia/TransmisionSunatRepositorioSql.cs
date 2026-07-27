@@ -64,7 +64,7 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdTransmisionSunat", idTransmisionSunat);
-            comando.Parameters.AddWithValue("@vchEstadoCodigo", resultado.EstadoCodigo);
+            comando.Parameters.AddWithValue("@intEstadoCodigo", (int)resultado.EstadoCodigo);
             comando.Parameters.AddWithValue("@intIdArchivoRespuesta", (object?)resultado.IdArchivoRespuesta ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatCodigoEstado", (object?)resultado.SunatCodigoEstado ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatMensajeEstado", (object?)resultado.SunatMensajeEstado ?? DBNull.Value);

@@ -71,7 +71,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         }
 
         var claveSolDescifrada = await cifradoServicio.DescifrarAsync(
-            idInquilino, claveSol.Datos.VersionLlave, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
+            idInquilino, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
         if (claveSolDescifrada.IdTipoMensaje != TipoMensaje.Exito || claveSolDescifrada.Datos is null)
         {
             return new ResultadoOperacion<ResultadoConsultaTicket>(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, default);
@@ -88,21 +88,21 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         }
 
         // 98: todavía en proceso — solo se refleja el estado, no hay CDR que interpretar aún.
-        if (consulta.Datos.EstadoCodigo == "TicketPendiente")
+        if (consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.TicketPendiente)
         {
             await loteRepositorio.ActualizarEstadoSunatAsync(
-                UsuarioWorker, idInquilino, idLoteDocumento, "TicketPendiente", cabecera.Ticket, null, null, cancellationToken);
+                UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketPendiente, cabecera.Ticket, null, null, cancellationToken);
 
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
         }
 
         // 99: error técnico de SUNAT al procesar el ticket, sin CDR utilizable.
-        if (consulta.Datos.EstadoCodigo == "TicketConError")
+        if (consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.TicketConError)
         {
             await loteRepositorio.ActualizarEstadoSunatAsync(
-                UsuarioWorker, idInquilino, idLoteDocumento, "TicketConError", cabecera.Ticket, null, null, cancellationToken);
+                UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, cabecera.Ticket, null, null, cancellationToken);
             await itemRepositorio.ActualizarEstadoSunatTodosAsync(
-                UsuarioWorker, idInquilino, idLoteDocumento, "TicketConError", null, null, cancellationToken);
+                UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, null, null, cancellationToken);
 
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
         }
@@ -118,8 +118,8 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             UsuarioWorker, idInquilino, idLoteDocumento, consulta.Datos.EstadoCodigo,
             consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, cancellationToken);
 
-        var esAceptado = consulta.Datos.EstadoCodigo == "ComunicacionBajaAceptada";
-        var severidad = consulta.Datos.EstadoCodigo == "Rechazado" ? "Error" : "Advertencia";
+        var esAceptado = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.ComunicacionBajaAceptada;
+        var severidad = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.Rechazado ? "Error" : "Advertencia";
 
         foreach (var item in lote.Datos.Items)
         {

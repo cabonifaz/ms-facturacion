@@ -4,4 +4,4 @@ namespace ms_facturacion.Dominio;
 /// nunca debe cruzar hacia un Controller.
 public sealed record CredencialInquilinoDetalle(
     int IdCredencialInquilino, int IdEmpresa, string TipoCredencialCodigo, string Usuario,
-    byte[] ValorCifrado, byte[] Nonce, byte[] Tag, int VersionLlave, bool Activo, DateTime? FchRotacion);
+    byte[] ValorCifrado, byte[] Nonce, byte[] Tag, bool Activo, DateTime? FchRotacion);

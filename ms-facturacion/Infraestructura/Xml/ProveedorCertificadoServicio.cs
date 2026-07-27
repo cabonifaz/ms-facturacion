@@ -31,8 +31,7 @@ public sealed class ProveedorCertificadoServicio(
         }
 
         var clave = await cifradoServicio.DescifrarAsync(
-            idInquilino, credencial.Datos.VersionLlave, credencial.Datos.ValorCifrado,
-            credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
+            idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
         if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
         {
             return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);

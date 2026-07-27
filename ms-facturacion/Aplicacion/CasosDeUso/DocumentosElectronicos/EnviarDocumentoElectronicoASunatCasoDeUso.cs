@@ -116,7 +116,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         }
 
         var claveSolDescifrada = await cifradoServicio.DescifrarAsync(
-            idInquilino, claveSol.Datos.VersionLlave, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
+            idInquilino, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
         if (claveSolDescifrada.IdTipoMensaje != TipoMensaje.Exito || claveSolDescifrada.Datos is null)
         {
             return new ResultadoOperacion<ResultadoEnvioSunat>(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, default);
@@ -154,7 +154,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         {
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat("Error", null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.Error, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
 
             return new ResultadoOperacion<ResultadoEnvioSunat>(envio.IdTipoMensaje, envio.Mensaje, default);
@@ -169,9 +169,9 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
                 envio.Datos.EstadoCodigo, idArchivoCdr, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, null),
             cancellationToken);
 
-        if (envio.Datos.EstadoCodigo != "Aceptado")
+        if (envio.Datos.EstadoCodigo != EstadoMaestroCodigo.Aceptado)
         {
-            var severidad = envio.Datos.EstadoCodigo == "Rechazado" ? "Error" : "Advertencia";
+            var severidad = envio.Datos.EstadoCodigo == EstadoMaestroCodigo.Rechazado ? "Error" : "Advertencia";
             await errorRepositorio.InsertarAsync(
                 UsuarioWorker, idInquilino,
                 new ErrorDocumento(

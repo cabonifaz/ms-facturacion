@@ -22,16 +22,23 @@ public sealed record InsertarDocumentoElectronicoPeticion(
     IReadOnlyList<ItemPeticion> Items);
 
 public sealed record ActualizarEstadoSunatPeticion(
-    string EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
+    EstadoMaestroCodigo EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
 
-/// Igual a ItemPeticion pero sin NumeroLinea — lo asigna el SP (MAX(NumeroLinea)+1) al agregar/actualizar.
-public sealed record LineaPeticion(
+/// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
+/// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
+public sealed record LineaEdicionPeticion(
     string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
     decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv);
+    string AfectacionIgvCodigo, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
-/// Igual a CuotaPeticion pero sin NumeroCuota — lo asigna el SP (MAX(NumeroCuota)+1) al agregar.
-public sealed record CuotaEdicionPeticion(DateOnly FechaVencimiento, decimal Monto);
+/// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
+public sealed record CuotaEdicionPeticion(
+    DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
+
+public sealed record GuardarCambiosDocumentoElectronicoPeticion(
+    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
+
+public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
 [ApiController]
 [Route("api/v1/documentos-electronicos")]
@@ -41,12 +48,8 @@ public sealed class DocumentosElectronicosController(
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
-    AgregarLineaDocumentoElectronicoCasoDeUso agregarLineaCasoDeUso,
-    ActualizarLineaDocumentoElectronicoCasoDeUso actualizarLineaCasoDeUso,
-    EliminarLineaDocumentoElectronicoCasoDeUso eliminarLineaCasoDeUso,
-    AgregarCuotaDocumentoElectronicoCasoDeUso agregarCuotaCasoDeUso,
-    ActualizarCuotaDocumentoElectronicoCasoDeUso actualizarCuotaCasoDeUso,
-    EliminarCuotaDocumentoElectronicoCasoDeUso eliminarCuotaCasoDeUso) : ControllerBase
+    GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
+    ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
     private const string UsuarioEjecutor = "ms-facturacion";
@@ -83,71 +86,42 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
-    // "Guardar" deja el documento en PendienteEnvio, editable — agregar/actualizar/quitar líneas y cuotas
-    // mientras no se haya confirmado el envío (ver EnviarASunat, "Confirmar con SUNAT").
-    [HttpPost("{idDocumentoElectronico:int}/lineas")]
-    public async Task<IActionResult> AgregarLinea(
-        [FromQuery] int idInquilino, int idDocumentoElectronico, LineaPeticion peticion, CancellationToken cancellationToken)
+    // "Guardar" deja el documento en PendienteEnvio, editable — el llamador manda el estado final deseado
+    // de líneas y cuotas (una sola vez, con el botón "Guardar cambios") y el SP calcula el diff
+    // (insertar/actualizar/dar de baja) mientras no se haya confirmado el envío (ver EnviarASunat,
+    // "Confirmar con SUNAT"). Reemplaza el diseño anterior de 6 endpoints granulares por línea/cuota.
+    [HttpPut("{idDocumentoElectronico:int}/guardar-cambios")]
+    public async Task<IActionResult> GuardarCambios(
+        [FromQuery] int idInquilino, int idDocumentoElectronico,
+        GuardarCambiosDocumentoElectronicoPeticion peticion, CancellationToken cancellationToken)
     {
-        var linea = new LineaDocumentoElectronicoEntrada(
-            0, peticion.ProductoCodigo, peticion.ProductoSunatCodigo, peticion.Descripcion, peticion.UnidadMedidaCodigo,
-            peticion.Cantidad, peticion.ValorUnitario, peticion.PrecioUnitario, peticion.MontoDescuento,
-            peticion.AfectacionIgvCodigo, peticion.PorcentajeIgv);
+        var lineas = peticion.Lineas
+            .Select(linea => new LineaDocumentoElectronicoEntrada(
+                linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.UnidadMedidaCodigo,
+                linea.Cantidad, linea.ValorUnitario, linea.PrecioUnitario, linea.MontoDescuento,
+                linea.AfectacionIgvCodigo, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
+            .ToList();
 
-        var resultado = await agregarLineaCasoDeUso.EjecutarAsync(UsuarioEjecutor, idInquilino, idDocumentoElectronico, linea, cancellationToken);
+        var cuotas = peticion.Cuotas
+            .Select(cuota => new CuotaDocumentoElectronico(
+                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdCuotaDocumentoElectronico))
+            .ToList();
+
+        var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, lineas, cuotas, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
-    [HttpPut("{idDocumentoElectronico:int}/lineas/{idLineaDocumentoElectronico:int}")]
-    public async Task<IActionResult> ActualizarLinea(
-        [FromQuery] int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
-        LineaPeticion peticion, CancellationToken cancellationToken)
-    {
-        var linea = new LineaDocumentoElectronicoEntrada(
-            0, peticion.ProductoCodigo, peticion.ProductoSunatCodigo, peticion.Descripcion, peticion.UnidadMedidaCodigo,
-            peticion.Cantidad, peticion.ValorUnitario, peticion.PrecioUnitario, peticion.MontoDescuento,
-            peticion.AfectacionIgvCodigo, peticion.PorcentajeIgv);
-
-        var resultado = await actualizarLineaCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idLineaDocumentoElectronico, linea, cancellationToken);
-        return ResponderSegunEnvelope(resultado);
-    }
-
-    [HttpDelete("{idDocumentoElectronico:int}/lineas/{idLineaDocumentoElectronico:int}")]
-    public async Task<IActionResult> EliminarLinea(
-        [FromQuery] int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico, CancellationToken cancellationToken)
-    {
-        var resultado = await eliminarLineaCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idLineaDocumentoElectronico, cancellationToken);
-        return ResponderSegunEnvelope(resultado);
-    }
-
-    [HttpPost("{idDocumentoElectronico:int}/cuotas")]
-    public async Task<IActionResult> AgregarCuota(
-        [FromQuery] int idInquilino, int idDocumentoElectronico, CuotaEdicionPeticion peticion, CancellationToken cancellationToken)
-    {
-        var resultado = await agregarCuotaCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.FechaVencimiento, peticion.Monto, cancellationToken);
-        return ResponderSegunEnvelope(resultado);
-    }
-
-    [HttpPut("{idDocumentoElectronico:int}/cuotas/{idCuotaDocumentoElectronico:int}")]
-    public async Task<IActionResult> ActualizarCuota(
+    // Marca el estado de pago de una cuota (Pendiente/Pagado) — no requiere que el documento esté en
+    // ningún EstadoCodigo particular: el pago puede ocurrir mucho después de que SUNAT ya aceptó el documento.
+    [HttpPut("{idDocumentoElectronico:int}/cuotas/{idCuotaDocumentoElectronico:int}/estado")]
+    public async Task<IActionResult> ActualizarEstadoCuota(
         [FromQuery] int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        CuotaEdicionPeticion peticion, CancellationToken cancellationToken)
+        ActualizarEstadoCuotaPeticion peticion, CancellationToken cancellationToken)
     {
-        var resultado = await actualizarCuotaCasoDeUso.EjecutarAsync(
+        var resultado = await actualizarEstadoCuotaCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico,
-            peticion.FechaVencimiento, peticion.Monto, cancellationToken);
-        return ResponderSegunEnvelope(resultado);
-    }
-
-    [HttpDelete("{idDocumentoElectronico:int}/cuotas/{idCuotaDocumentoElectronico:int}")]
-    public async Task<IActionResult> EliminarCuota(
-        [FromQuery] int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico, CancellationToken cancellationToken)
-    {
-        var resultado = await eliminarCuotaCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico, cancellationToken);
+            peticion.EstadoCuotaCodigo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

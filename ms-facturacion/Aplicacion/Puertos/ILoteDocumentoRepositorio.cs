@@ -13,6 +13,6 @@ public interface ILoteDocumentoRepositorio
         int idInquilino, int idLoteDocumento, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<int>> ActualizarEstadoSunatAsync(
-        string usuarioEjecutor, int idInquilino, int idLoteDocumento, string estadoCodigo, string? ticket,
+        string usuarioEjecutor, int idInquilino, int idLoteDocumento, EstadoMaestroCodigo estadoCodigo, string? ticket,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, CancellationToken cancellationToken);
 }

@@ -8,5 +8,5 @@ public sealed record NuevaTransmisionSunat(
 
 /// Datos para cerrar un intento ya abierto (SP_TransmisionSunat_Actualizar) con el resultado real.
 public sealed record ResultadoTransmisionSunat(
-    string EstadoCodigo, int? IdArchivoRespuesta, string? SunatCodigoEstado, string? SunatMensajeEstado,
+    EstadoMaestroCodigo EstadoCodigo, int? IdArchivoRespuesta, string? SunatCodigoEstado, string? SunatMensajeEstado,
     string? TipoError, string? MensajeError);

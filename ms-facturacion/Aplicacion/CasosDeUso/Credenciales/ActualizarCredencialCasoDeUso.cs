@@ -18,7 +18,7 @@ public sealed class ActualizarCredencialCasoDeUso(ICifradoInquilinoServicio cifr
 
         return await repositorio.ActualizarAsync(
             usuarioEjecutor, idInquilino, idCredencialInquilino, usuario,
-            cifrado.Datos.ValorCifrado, cifrado.Datos.Nonce, cifrado.Datos.Tag, cifrado.Datos.VersionLlave,
+            cifrado.Datos.ValorCifrado, cifrado.Datos.Nonce, cifrado.Datos.Tag,
             activo, cancellationToken);
     }
 }

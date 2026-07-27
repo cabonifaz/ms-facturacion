@@ -19,7 +19,7 @@ public sealed class InsertarCredencialCasoDeUso(ICifradoInquilinoServicio cifrad
 
         return await repositorio.InsertarAsync(
             usuarioEjecutor, idInquilino, idEmpresa, tipoCredencialCodigo, usuario,
-            cifrado.Datos.ValorCifrado, cifrado.Datos.Nonce, cifrado.Datos.Tag, cifrado.Datos.VersionLlave,
+            cifrado.Datos.ValorCifrado, cifrado.Datos.Nonce, cifrado.Datos.Tag,
             activo, cancellationToken);
     }
 }

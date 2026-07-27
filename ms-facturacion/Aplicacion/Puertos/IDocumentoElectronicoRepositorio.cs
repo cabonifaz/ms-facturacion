@@ -20,34 +20,24 @@ public interface IDocumentoElectronicoRepositorio
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> ActualizarEstadoSunatAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string estadoCodigo, string? sunatHash,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
 
-    Task<ResultadoOperacion<LineaDocumentoElectronico>> AgregarLineaAsync(
+    /// "Guardar cambios" en lote: reemplaza el diseño anterior de 6 endpoints granulares (Agregar/Actualizar/
+    /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
+    /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
+    Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
-        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken);
-
-    Task<ResultadoOperacion<LineaDocumentoElectronico>> ActualizarLineaAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
-        LineaDocumentoElectronicoEntrada linea, CancellationToken cancellationToken);
-
-    Task<ResultadoOperacion<bool>> EliminarLineaAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idLineaDocumentoElectronico,
+        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken);
 
-    Task<ResultadoOperacion<CuotaDocumentoElectronico>> AgregarCuotaAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
-        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken);
-
-    Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarCuotaAsync(
+    /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo
+    /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT.
+    Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarEstadoCuotaAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        DateOnly fechaVencimiento, decimal monto, CancellationToken cancellationToken);
-
-    Task<ResultadoOperacion<bool>> EliminarCuotaAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        CancellationToken cancellationToken);
+        EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken);
 }

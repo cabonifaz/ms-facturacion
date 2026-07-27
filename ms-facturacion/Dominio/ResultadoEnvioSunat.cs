@@ -5,4 +5,4 @@ namespace ms_facturacion.Dominio;
 /// (Aceptado / AceptadoConObservaciones / Rechazado) según el rango de SunatCodigoRespuesta
 /// (0 / 4000+ / 2000-3999 — ver flujo_tablas_microservicio_facturacion_sunat.md §10).
 public sealed record ResultadoEnvioSunat(
-    string EstadoCodigo, string SunatCodigoRespuesta, string SunatDescripcionRespuesta, byte[] CdrZipBytes, byte[] CdrXmlBytes);
+    EstadoMaestroCodigo EstadoCodigo, string SunatCodigoRespuesta, string SunatDescripcionRespuesta, byte[] CdrZipBytes, byte[] CdrXmlBytes);

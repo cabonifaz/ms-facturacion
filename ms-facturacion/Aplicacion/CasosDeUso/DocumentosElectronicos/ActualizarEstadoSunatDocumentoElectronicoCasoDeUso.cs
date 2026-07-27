@@ -8,7 +8,7 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 public sealed class ActualizarEstadoSunatDocumentoElectronicoCasoDeUso(IDocumentoElectronicoRepositorio repositorio)
 {
     public Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> EjecutarAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string estadoCodigo, string? sunatHash,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken) =>
         repositorio.ActualizarEstadoSunatAsync(
             usuarioEjecutor, idInquilino, idDocumentoElectronico, estadoCodigo, sunatHash,

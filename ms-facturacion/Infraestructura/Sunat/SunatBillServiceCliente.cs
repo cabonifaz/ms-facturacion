@@ -108,27 +108,27 @@ public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillS
 
     /// Rangos de ResponseCode: 0 = Aceptado, 2000-3999 = Rechazado, 4000+ = AceptadoConObservaciones
     /// (ver flujo_tablas_microservicio_facturacion_sunat.md §10 / payload_input_output_sunat.md §2.3).
-    private static string MapearEstadoCodigo(string codigoRespuesta)
+    private static EstadoMaestroCodigo MapearEstadoCodigo(string codigoRespuesta)
     {
         if (codigoRespuesta == "0")
         {
-            return "Aceptado";
+            return EstadoMaestroCodigo.Aceptado;
         }
 
         if (int.TryParse(codigoRespuesta, out var codigo))
         {
             if (codigo is >= 2000 and <= 3999)
             {
-                return "Rechazado";
+                return EstadoMaestroCodigo.Rechazado;
             }
 
             if (codigo >= 4000)
             {
-                return "AceptadoConObservaciones";
+                return EstadoMaestroCodigo.AceptadoConObservaciones;
             }
         }
 
-        return "Rechazado";
+        return EstadoMaestroCodigo.Rechazado;
     }
 
     private static byte[] ExtraerXmlDelZip(byte[] zipBytes)

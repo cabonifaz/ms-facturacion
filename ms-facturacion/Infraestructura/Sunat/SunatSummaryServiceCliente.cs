@@ -90,7 +90,7 @@ public sealed class SunatSummaryServiceCliente(HttpClient httpClient) : ISunatSu
             {
                 return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(
                     "SUNAT todavía está procesando el ticket.",
-                    new ResultadoConsultaTicket("TicketPendiente", statusCode, null, null));
+                    new ResultadoConsultaTicket(EstadoMaestroCodigo.TicketPendiente, statusCode, null, null));
             }
 
             // 99 = terminó con error, sin CDR utilizable.
@@ -98,7 +98,7 @@ public sealed class SunatSummaryServiceCliente(HttpClient httpClient) : ISunatSu
             {
                 return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(
                     "SUNAT terminó de procesar el ticket con error.",
-                    new ResultadoConsultaTicket("TicketConError", statusCode, null, null));
+                    new ResultadoConsultaTicket(EstadoMaestroCodigo.TicketConError, statusCode, null, null));
             }
 
             // 0 = procesado, viene el CDR en base64 dentro de <content>.
@@ -131,27 +131,27 @@ public sealed class SunatSummaryServiceCliente(HttpClient httpClient) : ISunatSu
 
     /// Comunicación de baja aceptada usa su propio estado terminal (ComunicacionBajaAceptada) en vez de
     /// "Aceptado" — mismo mapeo de rangos que sendBill (0/2000-3999/4000+, ver payload_input_output_sunat.md §2.3).
-    private static string MapearEstadoCodigo(string codigoRespuesta)
+    private static EstadoMaestroCodigo MapearEstadoCodigo(string codigoRespuesta)
     {
         if (codigoRespuesta == "0")
         {
-            return "ComunicacionBajaAceptada";
+            return EstadoMaestroCodigo.ComunicacionBajaAceptada;
         }
 
         if (int.TryParse(codigoRespuesta, out var codigo))
         {
             if (codigo is >= 2000 and <= 3999)
             {
-                return "Rechazado";
+                return EstadoMaestroCodigo.Rechazado;
             }
 
             if (codigo >= 4000)
             {
-                return "AceptadoConObservaciones";
+                return EstadoMaestroCodigo.AceptadoConObservaciones;
             }
         }
 
-        return "Rechazado";
+        return EstadoMaestroCodigo.Rechazado;
     }
 
     private static XDocument ConstruirSobre(string usuarioSolCompleto, string claveSol, XElement cuerpoOperacion) =>

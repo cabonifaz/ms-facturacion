@@ -72,7 +72,7 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         }
 
         var claveSolDescifrada = await cifradoServicio.DescifrarAsync(
-            idInquilino, claveSol.Datos.VersionLlave, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
+            idInquilino, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
         if (claveSolDescifrada.IdTipoMensaje != TipoMensaje.Exito || claveSolDescifrada.Datos is null)
         {
             return new ResultadoOperacion<LoteDocumentoCreado>(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, default);
@@ -109,7 +109,7 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         {
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat("Error", null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.Error, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
 
             return new ResultadoOperacion<LoteDocumentoCreado>(envio.IdTipoMensaje, envio.Mensaje, default);
@@ -117,11 +117,11 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
 
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
-            new ResultadoTransmisionSunat("TicketRecibido", null, null, null, null, null),
+            new ResultadoTransmisionSunat(EstadoMaestroCodigo.TicketRecibido, null, null, null, null, null),
             cancellationToken);
 
         await loteRepositorio.ActualizarEstadoSunatAsync(
-            UsuarioWorker, idInquilino, lote.Datos.Cabecera.IdLoteDocumento, "TicketRecibido", envio.Datos, null, null, cancellationToken);
+            UsuarioWorker, idInquilino, lote.Datos.Cabecera.IdLoteDocumento, EstadoMaestroCodigo.TicketRecibido, envio.Datos, null, null, cancellationToken);
 
         var resultado = new LoteDocumentoCreado(
             lote.Datos.Cabecera.IdLoteDocumento, lote.Datos.Cabecera.Nombre, "TicketRecibido", lote.Datos.Cabecera.FechaGeneracion);

@@ -15,7 +15,7 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
 
     public async Task<ResultadoOperacion<int>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string tipoCredencialCodigo, string usuario,
-        byte[] valorCifrado, byte[] nonce, byte[] tag, int versionLlave, bool activo, CancellationToken cancellationToken)
+        byte[] valorCifrado, byte[] nonce, byte[] tag, bool activo, CancellationToken cancellationToken)
     {
         try
         {
@@ -30,7 +30,6 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
             comando.Parameters.Add("@varbinValorCifrado", SqlDbType.VarBinary).Value = valorCifrado;
             comando.Parameters.Add("@varbinNonce", SqlDbType.VarBinary, 12).Value = nonce;
             comando.Parameters.Add("@varbinTag", SqlDbType.VarBinary, 16).Value = tag;
-            comando.Parameters.AddWithValue("@intVersionLlave", versionLlave);
             comando.Parameters.AddWithValue("@bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
@@ -85,7 +84,6 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
                 (byte[])lector["ValorCifrado"],
                 (byte[])lector["Nonce"],
                 (byte[])lector["Tag"],
-                lector.GetInt32(lector.GetOrdinal("VersionLlave")),
                 lector.GetBoolean(lector.GetOrdinal("Activo")),
                 lector.IsDBNull(lector.GetOrdinal("FchRotacion")) ? null : lector.GetDateTime(lector.GetOrdinal("FchRotacion")));
 
@@ -126,8 +124,7 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
                 lector.GetString(lector.GetOrdinal("Usuario")),
                 (byte[])lector["ValorCifrado"],
                 (byte[])lector["Nonce"],
-                (byte[])lector["Tag"],
-                lector.GetInt32(lector.GetOrdinal("VersionLlave")));
+                (byte[])lector["Tag"]);
 
             return ResultadoOperacion<CredencialInquilinoCifrada>.DeExito(mensaje, credencial);
         }
@@ -187,7 +184,7 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
 
     public async Task<ResultadoOperacion<int>> ActualizarAsync(
         string usuarioEjecutor, int idInquilino, int idCredencialInquilino, string usuario,
-        byte[] valorCifrado, byte[] nonce, byte[] tag, int versionLlave, bool activo, CancellationToken cancellationToken)
+        byte[] valorCifrado, byte[] nonce, byte[] tag, bool activo, CancellationToken cancellationToken)
     {
         try
         {
@@ -201,7 +198,6 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
             comando.Parameters.Add("@varbinValorCifrado", SqlDbType.VarBinary).Value = valorCifrado;
             comando.Parameters.Add("@varbinNonce", SqlDbType.VarBinary, 12).Value = nonce;
             comando.Parameters.Add("@varbinTag", SqlDbType.VarBinary, 16).Value = tag;
-            comando.Parameters.AddWithValue("@intVersionLlave", versionLlave);
             comando.Parameters.AddWithValue("@bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);

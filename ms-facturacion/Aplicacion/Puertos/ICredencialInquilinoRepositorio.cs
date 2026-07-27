@@ -9,7 +9,7 @@ public interface ICredencialInquilinoRepositorio
 {
     Task<ResultadoOperacion<int>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string tipoCredencialCodigo, string usuario,
-        byte[] valorCifrado, byte[] nonce, byte[] tag, int versionLlave, bool activo, CancellationToken cancellationToken);
+        byte[] valorCifrado, byte[] nonce, byte[] tag, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<CredencialInquilinoDetalle>> ObtenerAsync(
         int idInquilino, int idCredencialInquilino, CancellationToken cancellationToken);
@@ -22,7 +22,7 @@ public interface ICredencialInquilinoRepositorio
 
     Task<ResultadoOperacion<int>> ActualizarAsync(
         string usuarioEjecutor, int idInquilino, int idCredencialInquilino, string usuario,
-        byte[] valorCifrado, byte[] nonce, byte[] tag, int versionLlave, bool activo, CancellationToken cancellationToken);
+        byte[] valorCifrado, byte[] nonce, byte[] tag, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<int>> EliminarAsync(
         string usuarioEjecutor, int idInquilino, int idCredencialInquilino, CancellationToken cancellationToken);

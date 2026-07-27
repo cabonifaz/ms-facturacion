@@ -2,6 +2,7 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
+using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Infraestructura.Persistencia;
 
@@ -13,7 +14,7 @@ public sealed class ItemLoteDocumentoRepositorioSql(IConfiguration configuracion
         ?? throw new InvalidOperationException("No se configuró la cadena de conexión 'MsFacturacion'.");
 
     public async Task<ResultadoOperacion<int>> ActualizarEstadoSunatTodosAsync(
-        string usuarioEjecutor, int idInquilino, int idLoteDocumento, string estadoItemCodigo,
+        string usuarioEjecutor, int idInquilino, int idLoteDocumento, EstadoMaestroCodigo estadoItemCodigo,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, CancellationToken cancellationToken)
     {
         try
@@ -24,7 +25,7 @@ public sealed class ItemLoteDocumentoRepositorioSql(IConfiguration configuracion
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdLoteDocumento", idLoteDocumento);
-            comando.Parameters.AddWithValue("@vchEstadoItemCodigo", estadoItemCodigo);
+            comando.Parameters.AddWithValue("@intEstadoItemCodigo", (int)estadoItemCodigo);
             comando.Parameters.AddWithValue("@vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
 

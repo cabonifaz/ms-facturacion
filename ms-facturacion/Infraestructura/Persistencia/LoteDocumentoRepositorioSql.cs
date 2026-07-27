@@ -125,7 +125,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     }
 
     public async Task<ResultadoOperacion<int>> ActualizarEstadoSunatAsync(
-        string usuarioEjecutor, int idInquilino, int idLoteDocumento, string estadoCodigo, string? ticket,
+        string usuarioEjecutor, int idInquilino, int idLoteDocumento, EstadoMaestroCodigo estadoCodigo, string? ticket,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, CancellationToken cancellationToken)
     {
         try
@@ -136,7 +136,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdLoteDocumento", idLoteDocumento);
-            comando.Parameters.AddWithValue("@vchEstadoCodigo", estadoCodigo);
+            comando.Parameters.AddWithValue("@intEstadoCodigo", (int)estadoCodigo);
             comando.Parameters.AddWithValue("@vchTicket", (object?)ticket ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);

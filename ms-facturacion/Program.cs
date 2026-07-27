@@ -27,7 +27,6 @@ builder.Services.AddScoped<IEmpresaRepositorio, EmpresaRepositorioSql>();
 builder.Services.AddScoped<ISerieDocumentoRepositorio, SerieDocumentoRepositorioSql>();
 builder.Services.AddScoped<IDocumentoElectronicoRepositorio, DocumentoElectronicoRepositorioSql>();
 builder.Services.AddScoped<ICertificadoRepositorio, CertificadoRepositorioSql>();
-builder.Services.AddScoped<ILlaveCifradoInquilinoRepositorio, LlaveCifradoInquilinoRepositorioSql>();
 builder.Services.AddScoped<ICredencialInquilinoRepositorio, CredencialInquilinoRepositorioSql>();
 builder.Services.AddScoped<IConfiguracionFacturacionEmpresaRepositorio, ConfiguracionFacturacionEmpresaRepositorioSql>();
 builder.Services.AddScoped<ICifradoInquilinoServicio, CifradoInquilinoServicioAesGcm>();
@@ -74,12 +73,8 @@ builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
-builder.Services.AddScoped<AgregarLineaDocumentoElectronicoCasoDeUso>();
-builder.Services.AddScoped<ActualizarLineaDocumentoElectronicoCasoDeUso>();
-builder.Services.AddScoped<EliminarLineaDocumentoElectronicoCasoDeUso>();
-builder.Services.AddScoped<AgregarCuotaDocumentoElectronicoCasoDeUso>();
-builder.Services.AddScoped<ActualizarCuotaDocumentoElectronicoCasoDeUso>();
-builder.Services.AddScoped<EliminarCuotaDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso>();
 
 // Casos de Uso — Certificado
 builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();

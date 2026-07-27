@@ -19,7 +19,6 @@ public sealed class DescifrarCredencialPorTipoCasoDeUso(
         }
 
         return await cifradoServicio.DescifrarAsync(
-            idInquilino, credencial.Datos.VersionLlave, credencial.Datos.ValorCifrado,
-            credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
+            idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
     }
 }
