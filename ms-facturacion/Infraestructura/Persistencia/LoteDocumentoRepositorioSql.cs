@@ -162,6 +162,42 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         }
     }
 
+    public async Task<ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>> ListarPendientesTicketAsync(int tamanoPagina, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LoteDocumento_ListarPendientesTicket", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            var lotes = new List<LotePendienteTicket>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                lotes.Add(new LotePendienteTicket(
+                    lector.GetInt32(lector.GetOrdinal("IdInquilino")),
+                    lector.GetInt32(lector.GetOrdinal("IdLoteDocumento")),
+                    LeerNullableString(lector, "Ticket")));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>.DeExito(mensaje, lotes);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     private static string? LeerNullableString(SqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
