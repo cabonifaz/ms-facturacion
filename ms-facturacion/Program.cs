@@ -131,6 +131,7 @@ builder.Services.AddScoped<EliminarConfiguracionFacturacionEmpresaCasoDeUso>();
 // Casos de Uso — LoteDocumento (Comunicación de Baja)
 builder.Services.AddScoped<EnviarComunicacionBajaASunatCasoDeUso>();
 builder.Services.AddScoped<ConsultarTicketComunicacionBajaCasoDeUso>();
+builder.Services.AddScoped<ResolverTicketsPendientesCasoDeUso>();
 
 // Workers — resuelve tickets de Comunicación de Baja pendientes (ver SP_LoteDocumento_ListarPendientesTicket)
 builder.Services.AddHostedService<ResolverTicketsComunicacionBajaWorker>();
