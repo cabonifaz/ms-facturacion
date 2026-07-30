@@ -5,10 +5,6 @@ using ms_facturacion.Aplicacion.Puertos;
 
 namespace ms_facturacion.Infraestructura.Workers;
 
-/// Resuelve tickets de Comunicación de Baja pendientes (TicketRecibido/TicketPendiente) — sin esto, un
-/// lote enviado con sendSummary se queda esperando para siempre, porque nada más llama a
-/// ConsultarTicketComunicacionBajaCasoDeUso automáticamente. Corre sobre todos los inquilinos (ver
-/// SP_LoteDocumento_ListarPendientesTicket), no dentro de una request HTTP de un tenant específico.
 public sealed class ResolverTicketsComunicacionBajaWorker(
     IServiceScopeFactory scopeFactory, IHostEnvironment entorno, ILogger<ResolverTicketsComunicacionBajaWorker> logger)
     : BackgroundService
