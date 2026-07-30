@@ -15,11 +15,6 @@ public sealed class ResolverTicketsComunicacionBajaWorker(
 {
     private static readonly TimeSpan Intervalo = TimeSpan.FromMinutes(5);
 
-    // Tope por ciclo: los @TamanoPagina lotes pendientes más antiguos, no todo el backlog — evita
-    // bombardear el servicio de SUNAT si el backlog crece (no publica un límite de tasa oficial, pero
-    // es conocido que su infraestructura se degrada bajo carga concurrente alta).
-    private const int TamanoPagina = 50;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -42,7 +37,9 @@ public sealed class ResolverTicketsComunicacionBajaWorker(
         using var scope = scopeFactory.CreateScope();
         var loteRepositorio = scope.ServiceProvider.GetRequiredService<ILoteDocumentoRepositorio>();
 
-        var pendientes = await loteRepositorio.ListarPendientesTicketAsync(TamanoPagina, cancellationToken);
+        // El tope de fila por ciclo se resuelve dentro de SP_LoteDocumento_ListarPendientesTicket
+        // (TABLA_MAESTRA IdMaestro=9), no acá — así se puede ajustar con un UPDATE, sin redeploy.
+        var pendientes = await loteRepositorio.ListarPendientesTicketAsync(cancellationToken);
         if (pendientes.IdTipoMensaje != TipoMensaje.Exito || pendientes.Datos is null)
         {
             if (pendientes.IdTipoMensaje != TipoMensaje.Exito)

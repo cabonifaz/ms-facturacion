@@ -162,14 +162,12 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         }
     }
 
-    public async Task<ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>> ListarPendientesTicketAsync(int tamanoPagina, CancellationToken cancellationToken)
+    public async Task<ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>> ListarPendientesTicketAsync(CancellationToken cancellationToken)
     {
         try
         {
             await using var conexion = new SqlConnection(CadenaConexion);
             await using var comando = new SqlCommand("SP_LoteDocumento_ListarPendientesTicket", conexion) { CommandType = CommandType.StoredProcedure };
-
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
