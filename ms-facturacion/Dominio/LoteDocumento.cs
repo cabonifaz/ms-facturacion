@@ -15,3 +15,9 @@ public sealed record LoteDocumentoDetalle(LoteDocumento Cabecera, IReadOnlyList<
 public sealed record ItemBajaEntrada(int IdDocumentoElectronico, string MotivoDescripcion);
 
 public sealed record LoteDocumentoCreado(int IdLoteDocumento, string Nombre, string EstadoCodigo, DateTime FechaGeneracion);
+
+/// Fila de SP_LoteDocumento_ListarPendientesTicket — lotes en TicketRecibido/TicketPendiente, sin
+/// scope de inquilino (usado por el worker que resuelve tickets, no por una request HTTP de un tenant).
+public sealed record LotePendienteTicket(int IdInquilino, int IdLoteDocumento, string? Ticket);
+
+public sealed record ResultadoResolucionTicket(int IdInquilino, int IdLoteDocumento, bool Exito, string Mensaje);
