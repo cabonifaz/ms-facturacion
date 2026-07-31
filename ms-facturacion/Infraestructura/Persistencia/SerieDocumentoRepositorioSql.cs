@@ -14,7 +14,7 @@ public sealed class SerieDocumentoRepositorioSql(IConfiguration configuracion) :
         ?? throw new InvalidOperationException("No se configuró la cadena de conexión 'MsFacturacion'.");
 
     public async Task<ResultadoOperacion<int>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string tipoDocumentoCodigo, string serie,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, int idTipoDocumentoMaestro, string serie,
         int numeroActual, bool activo, CancellationToken cancellationToken)
     {
         try
@@ -25,7 +25,7 @@ public sealed class SerieDocumentoRepositorioSql(IConfiguration configuracion) :
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchTipoDocumentoCodigo", tipoDocumentoCodigo);
+            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
             comando.Parameters.AddWithValue("@vchSerie", serie);
             comando.Parameters.AddWithValue("@intNumeroActual", numeroActual);
             comando.Parameters.AddWithValue("@bitActivo", activo);
@@ -145,7 +145,7 @@ public sealed class SerieDocumentoRepositorioSql(IConfiguration configuracion) :
     }
 
     public async Task<ResultadoOperacion<int>> ActualizarAsync(
-        string usuarioEjecutor, int idInquilino, int idSerieDocumento, string tipoDocumentoCodigo, string serie,
+        string usuarioEjecutor, int idInquilino, int idSerieDocumento, int idTipoDocumentoMaestro, string serie,
         int numeroActual, bool activo, CancellationToken cancellationToken)
     {
         try
@@ -156,7 +156,7 @@ public sealed class SerieDocumentoRepositorioSql(IConfiguration configuracion) :
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdSerieDocumento", idSerieDocumento);
-            comando.Parameters.AddWithValue("@vchTipoDocumentoCodigo", tipoDocumentoCodigo);
+            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
             comando.Parameters.AddWithValue("@vchSerie", serie);
             comando.Parameters.AddWithValue("@intNumeroActual", numeroActual);
             comando.Parameters.AddWithValue("@bitActivo", activo);

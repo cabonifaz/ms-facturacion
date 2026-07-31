@@ -13,6 +13,9 @@ namespace ms_facturacion.Infraestructura.Xml;
 /// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo como columna propia — lo resuelve
 /// SP_DocumentoElectronico_Obtener contra TABLA_MAESTRA IdMaestro=9 (según haya o no cuotas activas) y
 /// llega ya resuelto en Cabecera.FormaPagoCodigo; este constructor no re-deriva nada, solo lee el valor.
+///
+/// TipoOperacionCodigo (Catálogo N.° 17 SUNAT) solo se emite en Factura/Boleta, como cbc:Note con
+/// languageLocaleID="1000" — no aplica a Nota de Crédito/Débito.
 public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComprobanteServicio
 {
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
@@ -72,7 +75,11 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         }
         else
         {
-            raiz.Add(new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo));
+            raiz.Add(
+                new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo),
+                // Catálogo N.° 17 SUNAT (Tipo de Operación) — languageLocaleID="1000" es la convención SUNAT
+                // para este catálogo dentro de cbc:Note (no aplica a notas de crédito/débito).
+                new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "1000"), cabecera.TipoOperacionCodigo));
         }
 
         raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));

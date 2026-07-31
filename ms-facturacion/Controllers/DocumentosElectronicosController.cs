@@ -7,7 +7,8 @@ namespace ms_facturacion.Controllers;
 
 public sealed record FormaPagoPeticion(string Codigo, IReadOnlyList<CuotaPeticion>? Cuotas);
 public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
-public sealed record ClientePeticion(string TipoDocumentoCodigo, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion);
+public sealed record ClientePeticion(
+    int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, string TipoReferenciaCodigo, string MotivoCodigo, string MotivoDescripcion);
 
 public sealed record ItemPeticion(
@@ -16,7 +17,7 @@ public sealed record ItemPeticion(
     string AfectacionIgvCodigo, decimal PorcentajeIgv);
 
 public sealed record InsertarDocumentoElectronicoPeticion(
-    int IdInquilino, int IdEmpresa, string SistemaOrigen, string IdExterno, string TipoDocumentoCodigo,
+    int IdInquilino, int IdEmpresa, string IdExterno, int IdTipoDocumentoMaestro,
     int IdSerieDocumento, DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, string TipoOperacionCodigo,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
     IReadOnlyList<ItemPeticion> Items);
@@ -59,8 +60,8 @@ public sealed class DocumentosElectronicosController(
     public async Task<IActionResult> Insertar(InsertarDocumentoElectronicoPeticion peticion, CancellationToken cancellationToken)
     {
         var cliente = new ClienteDatosEntrada(
-            peticion.Cliente.TipoDocumentoCodigo, peticion.Cliente.NumeroDocumento,
-            peticion.Cliente.Nombre, peticion.Cliente.Correo, peticion.Cliente.Direccion);
+            peticion.Cliente.IdTipoDocumentoSunat, peticion.Cliente.NumeroDocumento,
+            peticion.Cliente.Nombre, peticion.Cliente.Correo, peticion.Cliente.Direccion, peticion.Cliente.PaisCodigo);
 
         var documentoAfectado = peticion.DocumentoAfectado is null
             ? null
@@ -79,8 +80,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var resultado = await insertarCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.SistemaOrigen, peticion.IdExterno,
-            peticion.TipoDocumentoCodigo, peticion.IdSerieDocumento, peticion.FechaEmision, peticion.HoraEmision,
+            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno,
+            peticion.IdTipoDocumentoMaestro, peticion.IdSerieDocumento, peticion.FechaEmision, peticion.HoraEmision,
             peticion.MonedaCodigo, peticion.TipoOperacionCodigo, peticion.FormaPago.Codigo, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 
