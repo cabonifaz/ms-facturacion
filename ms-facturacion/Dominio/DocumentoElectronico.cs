@@ -4,7 +4,6 @@ public sealed class DocumentoElectronico
 {
     public required int IdDocumentoElectronico { get; init; }
     public required int IdEmpresa { get; init; }
-    public required int IdCliente { get; init; }
     public required string IdExterno { get; init; }
     public required string SistemaOrigen { get; init; }
     public required string TipoDocumentoCodigo { get; init; }

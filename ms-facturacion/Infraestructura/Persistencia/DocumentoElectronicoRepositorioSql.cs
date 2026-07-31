@@ -110,7 +110,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 IdDocumentoElectronico = lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                 IdEmpresa = lector.GetInt32(lector.GetOrdinal("IdEmpresa")),
-                IdCliente = lector.GetInt32(lector.GetOrdinal("IdCliente")),
                 IdExterno = lector.GetString(lector.GetOrdinal("IdExterno")),
                 SistemaOrigen = lector.GetString(lector.GetOrdinal("SistemaOrigen")),
                 TipoDocumentoCodigo = lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
