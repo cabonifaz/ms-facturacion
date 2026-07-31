@@ -120,6 +120,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 HoraEmision = TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
                 MonedaCodigo = lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                 TipoOperacionCodigo = lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
+                FormaPagoCodigo = lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                 EmpresaRuc = lector.GetString(lector.GetOrdinal("EmpresaRuc")),
                 EmpresaRazonSocial = lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
                 EmpresaNombreComercial = LeerNullableString(lector, "EmpresaNombreComercial"),

@@ -15,6 +15,10 @@ public sealed class DocumentoElectronico
     public required string MonedaCodigo { get; init; }
     public required string TipoOperacionCodigo { get; init; }
 
+    /// No es una columna persistida — SP_DocumentoElectronico_Obtener la resuelve contra
+    /// TABLA_MAESTRA IdMaestro=9 según haya o no cuotas activas ("Contado"/"Credito").
+    public required string FormaPagoCodigo { get; init; }
+
     public required string EmpresaRuc { get; init; }
     public required string EmpresaRazonSocial { get; init; }
     public string? EmpresaNombreComercial { get; init; }

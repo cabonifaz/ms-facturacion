@@ -10,9 +10,9 @@ namespace ms_facturacion.Infraestructura.Xml;
 /// total monetario (DebitNote usa RequestedMonetaryTotal, no LegalMonetaryTotal — quirk real de UBL 2.1),
 /// y que 07/08 agregan cac:DiscrepancyResponse + cac:BillingReference en vez de cbc:InvoiceTypeCode.
 ///
-/// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo por separado; se deriva de si el documento
-/// tiene cuotas (Credito) o no (Contado) — ver Detalle.Cuotas. Es una limitación conocida del esquema
-/// actual, no un error de este constructor.
+/// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo como columna propia — lo resuelve
+/// SP_DocumentoElectronico_Obtener contra TABLA_MAESTRA IdMaestro=9 (según haya o no cuotas activas) y
+/// llega ya resuelto en Cabecera.FormaPagoCodigo; este constructor no re-deriva nada, solo lee el valor.
 public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComprobanteServicio
 {
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
@@ -86,7 +86,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
-            ConstruirFormaPago(documento.Cuotas, cabecera.TotalImporte, moneda),
+            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
             ConstruirTaxTotal(cabecera, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
@@ -164,11 +164,12 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     }
 
     /// Anexo IV Res. 000193-2020/SUNAT (num. 170-173): Contado = un solo PaymentTerms; Credito = uno con
-    /// el monto neto pendiente + uno por cuota con PaymentDueDate/Amount.
+    /// el monto neto pendiente + uno por cuota con PaymentDueDate/Amount. formaPagoCodigo ya viene resuelto
+    /// por SP_DocumentoElectronico_Obtener (TABLA_MAESTRA IdMaestro=9) — este método no vuelve a inferirlo.
     private IEnumerable<XElement> ConstruirFormaPago(
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, decimal totalImporte, string moneda)
+        string formaPagoCodigo, IReadOnlyList<CuotaDocumentoElectronico> cuotas, decimal totalImporte, string moneda)
     {
-        if (cuotas.Count == 0)
+        if (formaPagoCodigo == "Contado")
         {
             yield return new XElement(Cac + "PaymentTerms",
                 new XElement(Cbc + "ID", "FormaPago"),
