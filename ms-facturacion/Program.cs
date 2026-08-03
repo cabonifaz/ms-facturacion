@@ -10,6 +10,7 @@ using ms_facturacion.Aplicacion.Puertos;
 using ms_facturacion.Infraestructura.Almacenamiento;
 using ms_facturacion.Infraestructura.Cifrado;
 using ms_facturacion.Infraestructura.Persistencia;
+using ms_facturacion.Infraestructura.Seguridad;
 using ms_facturacion.Infraestructura.Sunat;
 using ms_facturacion.Infraestructura.Workers;
 using ms_facturacion.Infraestructura.Xml;
@@ -141,6 +142,8 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseAuthorization();
 
