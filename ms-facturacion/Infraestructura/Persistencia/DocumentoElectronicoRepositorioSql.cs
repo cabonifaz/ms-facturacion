@@ -14,9 +14,9 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         ?? throw new InvalidOperationException("No se configuró la cadena de conexión 'MsFacturacion'.");
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string sistemaOrigen, string idExterno,
-        string tipoDocumentoCodigo, int idSerieDocumento, DateOnly fechaEmision, TimeOnly horaEmision,
-        string monedaCodigo, string tipoOperacionCodigo, string formaPagoCodigo, ClienteDatosEntrada cliente,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
+        int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
+        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
     {
@@ -28,20 +28,19 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchSistemaOrigen", sistemaOrigen);
             comando.Parameters.AddWithValue("@vchIdExterno", idExterno);
-            comando.Parameters.AddWithValue("@vchTipoDocumentoCodigo", tipoDocumentoCodigo);
-            comando.Parameters.AddWithValue("@intIdSerieDocumento", idSerieDocumento);
+            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
             comando.Parameters.AddWithValue("@dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.Add("@tmHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
-            comando.Parameters.AddWithValue("@chrMonedaCodigo", monedaCodigo);
-            comando.Parameters.AddWithValue("@vchTipoOperacionCodigo", tipoOperacionCodigo);
-            comando.Parameters.AddWithValue("@vchFormaPagoCodigo", formaPagoCodigo);
-            comando.Parameters.AddWithValue("@vchClienteTipoDocumentoCodigo", cliente.TipoDocumentoCodigo);
+            comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
+            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
             comando.Parameters.AddWithValue("@vchClienteNumeroDocumento", cliente.NumeroDocumento);
             comando.Parameters.AddWithValue("@vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchClienteCorreo", (object?)cliente.Correo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intClientePaisCodigo", cliente.PaisCodigo);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchTipoReferenciaCodigo", (object?)documentoAfectado?.TipoReferenciaCodigo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchMotivoCodigo", (object?)documentoAfectado?.MotivoCodigo ?? DBNull.Value);
@@ -110,9 +109,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 IdDocumentoElectronico = lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                 IdEmpresa = lector.GetInt32(lector.GetOrdinal("IdEmpresa")),
-                IdCliente = lector.GetInt32(lector.GetOrdinal("IdCliente")),
                 IdExterno = lector.GetString(lector.GetOrdinal("IdExterno")),
-                SistemaOrigen = lector.GetString(lector.GetOrdinal("SistemaOrigen")),
                 TipoDocumentoCodigo = lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
                 Serie = lector.GetString(lector.GetOrdinal("Serie")),
                 Correlativo = lector.GetInt32(lector.GetOrdinal("Correlativo")),
@@ -121,6 +118,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 HoraEmision = TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
                 MonedaCodigo = lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                 TipoOperacionCodigo = lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
+                FormaPagoCodigo = lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                 EmpresaRuc = lector.GetString(lector.GetOrdinal("EmpresaRuc")),
                 EmpresaRazonSocial = lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
                 EmpresaNombreComercial = LeerNullableString(lector, "EmpresaNombreComercial"),
@@ -337,7 +335,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken)
     {
@@ -349,6 +347,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION";

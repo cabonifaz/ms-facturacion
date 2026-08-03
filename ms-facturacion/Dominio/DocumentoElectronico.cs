@@ -4,9 +4,7 @@ public sealed class DocumentoElectronico
 {
     public required int IdDocumentoElectronico { get; init; }
     public required int IdEmpresa { get; init; }
-    public required int IdCliente { get; init; }
     public required string IdExterno { get; init; }
-    public required string SistemaOrigen { get; init; }
     public required string TipoDocumentoCodigo { get; init; }
     public required string Serie { get; init; }
     public required int Correlativo { get; init; }
@@ -15,6 +13,10 @@ public sealed class DocumentoElectronico
     public required TimeOnly HoraEmision { get; init; }
     public required string MonedaCodigo { get; init; }
     public required string TipoOperacionCodigo { get; init; }
+
+    /// No es una columna persistida — SP_DocumentoElectronico_Obtener la resuelve contra
+    /// TABLA_MAESTRA IdMaestro=9 según haya o no cuotas activas ("Contado"/"Credito").
+    public required string FormaPagoCodigo { get; init; }
 
     public required string EmpresaRuc { get; init; }
     public required string EmpresaRazonSocial { get; init; }

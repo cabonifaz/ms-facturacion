@@ -5,10 +5,10 @@ using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 namespace ms_facturacion.Controllers;
 
 public sealed record InsertarSerieDocumentoPeticion(
-    int IdInquilino, int IdEmpresa, string TipoDocumentoCodigo, string Serie, int NumeroActual, bool Activo);
+    int IdInquilino, int IdEmpresa, int IdTipoDocumentoMaestro, string Serie, int NumeroActual, bool Activo);
 
 public sealed record ActualizarSerieDocumentoPeticion(
-    string TipoDocumentoCodigo, string Serie, int NumeroActual, bool Activo);
+    int IdTipoDocumentoMaestro, string Serie, int NumeroActual, bool Activo);
 
 [ApiController]
 [Route("api/v1/series-documento")]
@@ -26,7 +26,7 @@ public sealed class SeriesDocumentoController(
     public async Task<IActionResult> Insertar(InsertarSerieDocumentoPeticion peticion, CancellationToken cancellationToken)
     {
         var resultado = await insertarCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.TipoDocumentoCodigo,
+            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdTipoDocumentoMaestro,
             peticion.Serie, peticion.NumeroActual, peticion.Activo, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
@@ -54,7 +54,7 @@ public sealed class SeriesDocumentoController(
         [FromQuery] int idInquilino, int idSerieDocumento, ActualizarSerieDocumentoPeticion peticion, CancellationToken cancellationToken)
     {
         var resultado = await actualizarCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idSerieDocumento, peticion.TipoDocumentoCodigo,
+            UsuarioEjecutor, idInquilino, idSerieDocumento, peticion.IdTipoDocumentoMaestro,
             peticion.Serie, peticion.NumeroActual, peticion.Activo, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);

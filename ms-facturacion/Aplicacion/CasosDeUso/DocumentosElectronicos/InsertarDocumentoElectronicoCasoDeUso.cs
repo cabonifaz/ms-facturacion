@@ -7,13 +7,13 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoRepositorio repositorio)
 {
     public Task<ResultadoOperacion<DocumentoElectronicoCreado>> EjecutarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string sistemaOrigen, string idExterno,
-        string tipoDocumentoCodigo, int idSerieDocumento, DateOnly fechaEmision, TimeOnly horaEmision,
-        string monedaCodigo, string tipoOperacionCodigo, string formaPagoCodigo, ClienteDatosEntrada cliente,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
+        int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
+        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken) =>
         repositorio.InsertarAsync(
-            usuarioEjecutor, idInquilino, idEmpresa, sistemaOrigen, idExterno, tipoDocumentoCodigo, idSerieDocumento,
-            fechaEmision, horaEmision, monedaCodigo, tipoOperacionCodigo, formaPagoCodigo, cliente,
+            usuarioEjecutor, idInquilino, idEmpresa, idExterno, idTipoDocumentoMaestro,
+            fechaEmision, horaEmision, idMonedaMaestro, idTipoOperacionMaestro, idFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 }
