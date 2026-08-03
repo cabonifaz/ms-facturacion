@@ -18,7 +18,7 @@ public sealed record ItemPeticion(
 
 public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, int IdTipoDocumentoMaestro,
-    DateOnly FechaEmision, TimeOnly HoraEmision, int IdMonedaMaestro, int IdTipoOperacionMaestro,
+    int IdMonedaMaestro, int IdTipoOperacionMaestro,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
     IReadOnlyList<ItemPeticion> Items);
 
@@ -81,7 +81,7 @@ public sealed class DocumentosElectronicosController(
 
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno,
-            peticion.IdTipoDocumentoMaestro, peticion.FechaEmision, peticion.HoraEmision,
+            peticion.IdTipoDocumentoMaestro,
             peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 
