@@ -7,8 +7,8 @@ public interface IDocumentoElectronicoRepositorio
 {
     Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
-        int idTipoDocumentoMaestro, int idSerieDocumento, DateOnly fechaEmision, TimeOnly horaEmision,
-        string monedaCodigo, string tipoOperacionCodigo, string formaPagoCodigo, ClienteDatosEntrada cliente,
+        int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
+        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken);
 
@@ -31,7 +31,7 @@ public interface IDocumentoElectronicoRepositorio
     /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken);
 
