@@ -10,7 +10,7 @@ public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoR
     // con su propio reloj, no confía en lo que mande el llamador. La emisión real se recalcula igual al
     // confirmar con SUNAT (ver EnviarDocumentoElectronicoASunatCasoDeUso).
     public Task<ResultadoOperacion<DocumentoElectronicoCreado>> EjecutarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro,
         int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
@@ -18,7 +18,7 @@ public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoR
     {
         var ahora = DateTime.Now;
         return repositorio.InsertarAsync(
-            usuarioEjecutor, idInquilino, idEmpresa, idExterno, idTipoDocumentoMaestro,
+            usuarioEjecutor, idInquilino, idEmpresa, idExterno, numeroReferencia, idTipoDocumentoMaestro,
             DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), idMonedaMaestro, idTipoOperacionMaestro, idFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
     }

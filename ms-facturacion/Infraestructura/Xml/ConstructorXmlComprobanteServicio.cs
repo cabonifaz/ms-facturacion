@@ -84,6 +84,12 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
 
         raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));
 
+        // cac:OrderReference — opcional (0..1 en la guía SUNAT), string plano (an..20) sin validación SUNAT.
+        if (!string.IsNullOrEmpty(cabecera.NumeroReferencia))
+        {
+            raiz.Add(new XElement(Cac + "OrderReference", new XElement(Cbc + "ID", cabecera.NumeroReferencia)));
+        }
+
         if (esNota)
         {
             raiz.Add(ConstruirBillingReference(documento.Referencia!));
