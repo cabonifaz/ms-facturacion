@@ -88,8 +88,8 @@ public sealed class ConfiguracionesFacturacionEmpresaController(
 
     private IActionResult ResponderSegunEnvelope<T>(ResultadoOperacion<T> resultado) => resultado.IdTipoMensaje switch
     {
-        TipoMensaje.Exito => Ok(new { resultado.Mensaje, Datos = resultado.Datos }),
-        TipoMensaje.ReglaDeNegocio => BadRequest(new { resultado.Mensaje }),
-        _ => StatusCode(StatusCodes.Status500InternalServerError, new { resultado.Mensaje })
+        TipoMensaje.Exito => Ok(new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje, Datos = resultado.Datos }),
+        TipoMensaje.ReglaDeNegocio => BadRequest(new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje }),
+        _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
