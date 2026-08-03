@@ -13,7 +13,7 @@ public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacio
 
 public sealed record ItemPeticion(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
-    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
+    decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
 public sealed record InsertarDocumentoElectronicoPeticion(
@@ -29,7 +29,7 @@ public sealed record ActualizarEstadoSunatPeticion(
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
     string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
-    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
+    decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
 /// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
@@ -73,7 +73,7 @@ public sealed class DocumentosElectronicosController(
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
                 item.NumeroLinea, item.ProductoCodigo, item.ProductoSunatCodigo, item.Descripcion, item.UnidadMedidaCodigo,
-                item.Cantidad, item.ValorUnitario, item.PrecioUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
+                item.Cantidad, item.ValorUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
         var cuotas = (peticion.FormaPago.Cuotas ?? [])
@@ -101,7 +101,7 @@ public sealed class DocumentosElectronicosController(
         var lineas = peticion.Lineas
             .Select(linea => new LineaDocumentoElectronicoEntrada(
                 linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.UnidadMedidaCodigo,
-                linea.Cantidad, linea.ValorUnitario, linea.PrecioUnitario, linea.MontoDescuento,
+                linea.Cantidad, linea.ValorUnitario, linea.MontoDescuento,
                 linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
             .ToList();
 

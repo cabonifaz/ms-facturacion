@@ -12,5 +12,5 @@ public sealed record LineaDocumentoElectronico(
 /// nueva, >0 = línea existente a actualizar.
 public sealed record LineaDocumentoElectronicoEntrada(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
-    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
+    decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int IdLineaDocumentoElectronico = 0);
