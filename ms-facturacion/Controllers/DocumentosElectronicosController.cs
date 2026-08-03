@@ -37,7 +37,8 @@ public sealed record CuotaEdicionPeticion(
     DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
 
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int IdFormaPago, string? NumeroReferencia, IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
+    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, int IdTipoOperacionMaestro,
+    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
 
 public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
@@ -110,7 +111,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia, lineas, cuotas, cancellationToken);
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
+            peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, lineas, cuotas, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

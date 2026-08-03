@@ -32,6 +32,7 @@ public interface IDocumentoElectronicoRepositorio
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken);
 

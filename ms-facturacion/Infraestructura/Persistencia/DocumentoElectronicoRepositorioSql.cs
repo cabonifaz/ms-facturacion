@@ -338,6 +338,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken)
     {
@@ -351,6 +352,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION";
