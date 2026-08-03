@@ -6,7 +6,7 @@ namespace ms_facturacion.Aplicacion.Puertos;
 public interface ISerieDocumentoRepositorio
 {
     Task<ResultadoOperacion<int>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string tipoDocumentoCodigo, string serie,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, int idTipoDocumentoMaestro, string serie,
         int numeroActual, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<SerieDocumento>> ObtenerAsync(
@@ -16,7 +16,7 @@ public interface ISerieDocumentoRepositorio
         int idInquilino, int idEmpresa, string? busqueda, int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<int>> ActualizarAsync(
-        string usuarioEjecutor, int idInquilino, int idSerieDocumento, string tipoDocumentoCodigo, string serie,
+        string usuarioEjecutor, int idInquilino, int idSerieDocumento, int idTipoDocumentoMaestro, string serie,
         int numeroActual, bool activo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<int>> EliminarAsync(

@@ -15,4 +15,6 @@ public interface ILoteDocumentoRepositorio
     Task<ResultadoOperacion<int>> ActualizarEstadoSunatAsync(
         string usuarioEjecutor, int idInquilino, int idLoteDocumento, EstadoMaestroCodigo estadoCodigo, string? ticket,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, CancellationToken cancellationToken);
+
+    Task<ResultadoOperacion<IReadOnlyList<LotePendienteTicket>>> ListarPendientesTicketAsync(CancellationToken cancellationToken);
 }

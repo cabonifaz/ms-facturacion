@@ -6,14 +6,20 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 
 public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoRepositorio repositorio)
 {
+    // FechaEmision/HoraEmision del borrador son solo un valor inicial de inserción: ms-facturacion las fija
+    // con su propio reloj, no confía en lo que mande el llamador. La emisión real se recalcula igual al
+    // confirmar con SUNAT (ver EnviarDocumentoElectronicoASunatCasoDeUso).
     public Task<ResultadoOperacion<DocumentoElectronicoCreado>> EjecutarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string sistemaOrigen, string idExterno,
-        string tipoDocumentoCodigo, int idSerieDocumento, DateOnly fechaEmision, TimeOnly horaEmision,
-        string monedaCodigo, string tipoOperacionCodigo, string formaPagoCodigo, ClienteDatosEntrada cliente,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
+        int idTipoDocumentoMaestro,
+        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken) =>
-        repositorio.InsertarAsync(
-            usuarioEjecutor, idInquilino, idEmpresa, sistemaOrigen, idExterno, tipoDocumentoCodigo, idSerieDocumento,
-            fechaEmision, horaEmision, monedaCodigo, tipoOperacionCodigo, formaPagoCodigo, cliente,
+        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
+    {
+        var ahora = DateTime.Now;
+        return repositorio.InsertarAsync(
+            usuarioEjecutor, idInquilino, idEmpresa, idExterno, numeroReferencia, idTipoDocumentoMaestro,
+            DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), idMonedaMaestro, idTipoOperacionMaestro, idFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
+    }
 }

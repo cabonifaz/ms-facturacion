@@ -10,9 +10,12 @@ namespace ms_facturacion.Infraestructura.Xml;
 /// total monetario (DebitNote usa RequestedMonetaryTotal, no LegalMonetaryTotal — quirk real de UBL 2.1),
 /// y que 07/08 agregan cac:DiscrepancyResponse + cac:BillingReference en vez de cbc:InvoiceTypeCode.
 ///
-/// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo por separado; se deriva de si el documento
-/// tiene cuotas (Credito) o no (Contado) — ver Detalle.Cuotas. Es una limitación conocida del esquema
-/// actual, no un error de este constructor.
+/// Nota: DOCUMENTOS_ELECTRONICOS no persiste FormaPagoCodigo como columna propia — lo resuelve
+/// SP_DocumentoElectronico_Obtener contra TABLA_MAESTRA IdMaestro=9 (según haya o no cuotas activas) y
+/// llega ya resuelto en Cabecera.FormaPagoCodigo; este constructor no re-deriva nada, solo lee el valor.
+///
+/// TipoOperacionCodigo (Catálogo N.° 17 SUNAT) solo se emite en Factura/Boleta, como cbc:Note con
+/// languageLocaleID="1000" — no aplica a Nota de Crédito/Débito.
 public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComprobanteServicio
 {
     private static readonly XNamespace Cac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
@@ -72,10 +75,20 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         }
         else
         {
-            raiz.Add(new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo));
+            raiz.Add(
+                new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo),
+                // Catálogo N.° 17 SUNAT (Tipo de Operación) — languageLocaleID="1000" es la convención SUNAT
+                // para este catálogo dentro de cbc:Note (no aplica a notas de crédito/débito).
+                new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "1000"), cabecera.TipoOperacionCodigo));
         }
 
         raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));
+
+        // cac:OrderReference — opcional (0..1 en la guía SUNAT), string plano (an..20) sin validación SUNAT.
+        if (!string.IsNullOrEmpty(cabecera.NumeroReferencia))
+        {
+            raiz.Add(new XElement(Cac + "OrderReference", new XElement(Cbc + "ID", cabecera.NumeroReferencia)));
+        }
 
         if (esNota)
         {
@@ -86,7 +99,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
-            ConstruirFormaPago(documento.Cuotas, cabecera.TotalImporte, moneda),
+            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
             ConstruirTaxTotal(cabecera, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
@@ -164,11 +177,12 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     }
 
     /// Anexo IV Res. 000193-2020/SUNAT (num. 170-173): Contado = un solo PaymentTerms; Credito = uno con
-    /// el monto neto pendiente + uno por cuota con PaymentDueDate/Amount.
+    /// el monto neto pendiente + uno por cuota con PaymentDueDate/Amount. formaPagoCodigo ya viene resuelto
+    /// por SP_DocumentoElectronico_Obtener (TABLA_MAESTRA IdMaestro=9) — este método no vuelve a inferirlo.
     private IEnumerable<XElement> ConstruirFormaPago(
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, decimal totalImporte, string moneda)
+        string formaPagoCodigo, IReadOnlyList<CuotaDocumentoElectronico> cuotas, decimal totalImporte, string moneda)
     {
-        if (cuotas.Count == 0)
+        if (formaPagoCodigo == "Contado")
         {
             yield return new XElement(Cac + "PaymentTerms",
                 new XElement(Cbc + "ID", "FormaPago"),
