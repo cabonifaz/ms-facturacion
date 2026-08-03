@@ -13,4 +13,4 @@ public sealed record LineaDocumentoElectronico(
 public sealed record LineaDocumentoElectronicoEntrada(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
     decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv, int IdLineaDocumentoElectronico = 0);
+    int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int IdLineaDocumentoElectronico = 0);

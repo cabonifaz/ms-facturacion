@@ -14,7 +14,7 @@ public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacio
 public sealed record ItemPeticion(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
     decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv);
+    int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
 public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
@@ -30,7 +30,7 @@ public sealed record ActualizarEstadoSunatPeticion(
 public sealed record LineaEdicionPeticion(
     string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
     decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
+    int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
 /// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
 public sealed record CuotaEdicionPeticion(
@@ -72,7 +72,7 @@ public sealed class DocumentosElectronicosController(
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
                 item.NumeroLinea, item.ProductoCodigo, item.ProductoSunatCodigo, item.Descripcion, item.UnidadMedidaCodigo,
-                item.Cantidad, item.ValorUnitario, item.PrecioUnitario, item.MontoDescuento, item.AfectacionIgvCodigo, item.PorcentajeIgv))
+                item.Cantidad, item.ValorUnitario, item.PrecioUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
         var cuotas = (peticion.FormaPago.Cuotas ?? [])
@@ -101,7 +101,7 @@ public sealed class DocumentosElectronicosController(
             .Select(linea => new LineaDocumentoElectronicoEntrada(
                 linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.UnidadMedidaCodigo,
                 linea.Cantidad, linea.ValorUnitario, linea.PrecioUnitario, linea.MontoDescuento,
-                linea.AfectacionIgvCodigo, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
+                linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
             .ToList();
 
         var cuotas = peticion.Cuotas
