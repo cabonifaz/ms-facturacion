@@ -13,12 +13,12 @@ public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacio
 
 public sealed record ItemPeticion(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
-    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv);
+    decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
+    int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
 public sealed record InsertarDocumentoElectronicoPeticion(
-    int IdInquilino, int IdEmpresa, string IdExterno, int IdTipoDocumentoMaestro,
-    DateOnly FechaEmision, TimeOnly HoraEmision, int IdMonedaMaestro, int IdTipoOperacionMaestro,
+    int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
+    int IdMonedaMaestro, int IdTipoOperacionMaestro,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
     IReadOnlyList<ItemPeticion> Items);
 
@@ -29,15 +29,16 @@ public sealed record ActualizarEstadoSunatPeticion(
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
     string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
-    decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario, decimal MontoDescuento,
-    string AfectacionIgvCodigo, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
+    decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
+    int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
 /// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
 public sealed record CuotaEdicionPeticion(
     DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
 
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int IdFormaPago, IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
+    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, int IdTipoOperacionMaestro,
+    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
 
 public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
@@ -72,7 +73,7 @@ public sealed class DocumentosElectronicosController(
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
                 item.NumeroLinea, item.ProductoCodigo, item.ProductoSunatCodigo, item.Descripcion, item.UnidadMedidaCodigo,
-                item.Cantidad, item.ValorUnitario, item.PrecioUnitario, item.MontoDescuento, item.AfectacionIgvCodigo, item.PorcentajeIgv))
+                item.Cantidad, item.ValorUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
         var cuotas = (peticion.FormaPago.Cuotas ?? [])
@@ -80,8 +81,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var resultado = await insertarCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno,
-            peticion.IdTipoDocumentoMaestro, peticion.FechaEmision, peticion.HoraEmision,
+            UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno, peticion.NumeroReferencia,
+            peticion.IdTipoDocumentoMaestro,
             peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
 
@@ -100,8 +101,8 @@ public sealed class DocumentosElectronicosController(
         var lineas = peticion.Lineas
             .Select(linea => new LineaDocumentoElectronicoEntrada(
                 linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.UnidadMedidaCodigo,
-                linea.Cantidad, linea.ValorUnitario, linea.PrecioUnitario, linea.MontoDescuento,
-                linea.AfectacionIgvCodigo, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
+                linea.Cantidad, linea.ValorUnitario, linea.MontoDescuento,
+                linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
             .ToList();
 
         var cuotas = peticion.Cuotas
@@ -110,7 +111,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, lineas, cuotas, cancellationToken);
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
+            peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, lineas, cuotas, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

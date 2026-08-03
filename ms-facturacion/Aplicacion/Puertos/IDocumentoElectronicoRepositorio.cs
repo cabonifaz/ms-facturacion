@@ -6,7 +6,7 @@ namespace ms_facturacion.Aplicacion.Puertos;
 public interface IDocumentoElectronicoRepositorio
 {
     Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
@@ -31,7 +31,8 @@ public interface IDocumentoElectronicoRepositorio
     /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken);
 

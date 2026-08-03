@@ -14,7 +14,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         ?? throw new InvalidOperationException("No se configuró la cadena de conexión 'MsFacturacion'.");
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
@@ -29,6 +29,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
             comando.Parameters.AddWithValue("@vchIdExterno", idExterno);
+            comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
             comando.Parameters.AddWithValue("@dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.Add("@tmHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
@@ -110,6 +111,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 IdDocumentoElectronico = lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                 IdEmpresa = lector.GetInt32(lector.GetOrdinal("IdEmpresa")),
                 IdExterno = lector.GetString(lector.GetOrdinal("IdExterno")),
+                NumeroReferencia = LeerNullableString(lector, "NumeroReferencia"),
                 TipoDocumentoCodigo = lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
                 Serie = lector.GetString(lector.GetOrdinal("Serie")),
                 Correlativo = lector.GetInt32(lector.GetOrdinal("Correlativo")),
@@ -335,7 +337,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken)
     {
@@ -348,6 +351,9 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION";
@@ -435,9 +441,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("UnidadMedidaCodigo", typeof(string));
         tabla.Columns.Add("Cantidad", typeof(decimal));
         tabla.Columns.Add("ValorUnitario", typeof(decimal));
-        tabla.Columns.Add("PrecioUnitario", typeof(decimal));
         tabla.Columns.Add("MontoDescuento", typeof(decimal));
-        tabla.Columns.Add("AfectacionIgvCodigo", typeof(string));
+        tabla.Columns.Add("IdAfectacionIgvMaestro", typeof(int));
         tabla.Columns.Add("PorcentajeIgv", typeof(decimal));
 
         foreach (var linea in lineas)
@@ -445,7 +450,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             tabla.Rows.Add(
                 linea.IdLineaDocumentoElectronico, linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.UnidadMedidaCodigo, linea.Cantidad, linea.ValorUnitario,
-                linea.PrecioUnitario, linea.MontoDescuento, linea.AfectacionIgvCodigo, linea.PorcentajeIgv);
+                linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
 
         return tabla;
@@ -507,9 +512,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("UnidadMedidaCodigo", typeof(string));
         tabla.Columns.Add("Cantidad", typeof(decimal));
         tabla.Columns.Add("ValorUnitario", typeof(decimal));
-        tabla.Columns.Add("PrecioUnitario", typeof(decimal));
         tabla.Columns.Add("MontoDescuento", typeof(decimal));
-        tabla.Columns.Add("AfectacionIgvCodigo", typeof(string));
+        tabla.Columns.Add("IdAfectacionIgvMaestro", typeof(int));
         tabla.Columns.Add("PorcentajeIgv", typeof(decimal));
 
         foreach (var linea in lineas)
@@ -517,7 +521,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             tabla.Rows.Add(
                 linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.UnidadMedidaCodigo, linea.Cantidad, linea.ValorUnitario,
-                linea.PrecioUnitario, linea.MontoDescuento, linea.AfectacionIgvCodigo, linea.PorcentajeIgv);
+                linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
 
         return tabla;
