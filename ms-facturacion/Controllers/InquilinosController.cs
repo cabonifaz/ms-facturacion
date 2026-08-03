@@ -63,8 +63,8 @@ public sealed class InquilinosController(
     /// Traduce el envelope IdTipoMensaje/Mensaje a códigos HTTP: 2=200, 1=400 (regla de negocio), 3=500 (error de sistema).
     private IActionResult ResponderSegunEnvelope<T>(ResultadoOperacion<T> resultado) => resultado.IdTipoMensaje switch
     {
-        TipoMensaje.Exito => Ok(new { resultado.Mensaje, Datos = resultado.Datos }),
-        TipoMensaje.ReglaDeNegocio => BadRequest(new { resultado.Mensaje }),
-        _ => StatusCode(StatusCodes.Status500InternalServerError, new { resultado.Mensaje })
+        TipoMensaje.Exito => Ok(new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje, Datos = resultado.Datos }),
+        TipoMensaje.ReglaDeNegocio => BadRequest(new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje }),
+        _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
