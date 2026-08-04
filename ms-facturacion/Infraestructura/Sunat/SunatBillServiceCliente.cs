@@ -26,6 +26,13 @@ public sealed class SunatBillServiceCliente(
     {
         try
         {
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation(
+                    "sendBill — usuarioSolCompleto.Length={LongitudUsuario}, fileName={NombreArchivoZip}, zipBytes={LongitudZip} bytes.",
+                    usuarioSolCompleto.Length, nombreArchivoZip, zipBytes.Length);
+            }
+
             var sobreEnvio = ConstruirSobreEnvio(usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes);
 
             using var contenido = new StringContent(sobreEnvio.ToString(SaveOptions.DisableFormatting), Encoding.UTF8, "text/xml");
