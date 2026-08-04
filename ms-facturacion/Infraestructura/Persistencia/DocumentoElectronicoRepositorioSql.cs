@@ -169,6 +169,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetDecimal(lector.GetOrdinal("PrecioUnitario")),
                     lector.GetDecimal(lector.GetOrdinal("MontoDescuento")),
                     lector.GetString(lector.GetOrdinal("AfectacionIgvCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoSunatCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoNombre")),
+                    lector.GetString(lector.GetOrdinal("TributoTaxTypeCode")),
+                    lector.GetString(lector.GetOrdinal("TributoCategoria")),
                     lector.GetDecimal(lector.GetOrdinal("PorcentajeIgv")),
                     lector.GetDecimal(lector.GetOrdinal("MontoIgv")),
                     lector.GetDecimal(lector.GetOrdinal("MontoIsc")),
@@ -478,7 +482,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("ProductoCodigo", typeof(string));
         tabla.Columns.Add("ProductoSunatCodigo", typeof(string));
         tabla.Columns.Add("Descripcion", typeof(string));
-        tabla.Columns.Add("UnidadMedidaCodigo", typeof(string));
+        tabla.Columns.Add("IdUnidadMedidaMaestro", typeof(int));
         tabla.Columns.Add("Cantidad", typeof(decimal));
         tabla.Columns.Add("ValorUnitario", typeof(decimal));
         tabla.Columns.Add("MontoDescuento", typeof(decimal));
@@ -489,7 +493,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         {
             tabla.Rows.Add(
                 linea.IdLineaDocumentoElectronico, linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
-                linea.Descripcion, linea.UnidadMedidaCodigo, linea.Cantidad, linea.ValorUnitario,
+                linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
 
@@ -525,6 +529,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetDecimal(lector.GetOrdinal("PrecioUnitario")),
         lector.GetDecimal(lector.GetOrdinal("MontoDescuento")),
         lector.GetString(lector.GetOrdinal("AfectacionIgvCodigo")),
+        lector.GetString(lector.GetOrdinal("TributoSunatCodigo")),
+        lector.GetString(lector.GetOrdinal("TributoNombre")),
+        lector.GetString(lector.GetOrdinal("TributoTaxTypeCode")),
+        lector.GetString(lector.GetOrdinal("TributoCategoria")),
         lector.GetDecimal(lector.GetOrdinal("PorcentajeIgv")),
         lector.GetDecimal(lector.GetOrdinal("MontoIgv")),
         lector.GetDecimal(lector.GetOrdinal("MontoIsc")),
@@ -549,7 +557,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("ProductoCodigo", typeof(string));
         tabla.Columns.Add("ProductoSunatCodigo", typeof(string));
         tabla.Columns.Add("Descripcion", typeof(string));
-        tabla.Columns.Add("UnidadMedidaCodigo", typeof(string));
+        tabla.Columns.Add("IdUnidadMedidaMaestro", typeof(int));
         tabla.Columns.Add("Cantidad", typeof(decimal));
         tabla.Columns.Add("ValorUnitario", typeof(decimal));
         tabla.Columns.Add("MontoDescuento", typeof(decimal));
@@ -560,7 +568,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         {
             tabla.Rows.Add(
                 linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
-                linea.Descripcion, linea.UnidadMedidaCodigo, linea.Cantidad, linea.ValorUnitario,
+                linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
 

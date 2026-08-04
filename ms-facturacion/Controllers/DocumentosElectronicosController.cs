@@ -12,7 +12,7 @@ public sealed record ClientePeticion(
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, string TipoReferenciaCodigo, string MotivoCodigo, string MotivoDescripcion);
 
 public sealed record ItemPeticion(
-    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
+    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
@@ -28,7 +28,7 @@ public sealed record ActualizarEstadoSunatPeticion(
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
-    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
+    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
@@ -73,7 +73,7 @@ public sealed class DocumentosElectronicosController(
 
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
-                item.NumeroLinea, item.ProductoCodigo, item.ProductoSunatCodigo, item.Descripcion, item.UnidadMedidaCodigo,
+                item.NumeroLinea, item.ProductoCodigo, item.ProductoSunatCodigo, item.Descripcion, item.IdUnidadMedidaMaestro,
                 item.Cantidad, item.ValorUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
@@ -101,7 +101,7 @@ public sealed class DocumentosElectronicosController(
     {
         var lineas = peticion.Lineas
             .Select(linea => new LineaDocumentoElectronicoEntrada(
-                linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.UnidadMedidaCodigo,
+                linea.NumeroLinea, linea.ProductoCodigo, linea.ProductoSunatCodigo, linea.Descripcion, linea.IdUnidadMedidaMaestro,
                 linea.Cantidad, linea.ValorUnitario, linea.MontoDescuento,
                 linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv, linea.IdLineaDocumentoElectronico))
             .ToList();
