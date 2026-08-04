@@ -52,6 +52,7 @@ public sealed class DocumentosElectronicosController(
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
+    ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -170,6 +171,15 @@ public sealed class DocumentosElectronicosController(
     {
         var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await enviarASunatCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Para que maximlian3_backend sincronice PEDIDO_FACTURA sondeando EVENTOS_DOCUMENTO desde un checkpoint.
+    [HttpGet("eventos-recientes")]
+    public async Task<IActionResult> ListarEventosRecientes(
+        [FromQuery] int idInquilino, [FromQuery] int ultimoIdEvento, CancellationToken cancellationToken)
+    {
+        var resultado = await listarEventosRecientesCasoDeUso.EjecutarAsync(idInquilino, ultimoIdEvento, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
