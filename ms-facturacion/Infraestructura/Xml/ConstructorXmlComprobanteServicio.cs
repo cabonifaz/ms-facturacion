@@ -238,6 +238,16 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                 new XElement(Cac + "AlternativeConditionPrice",
                     new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.PrecioUnitario.ToString("F6")),
                     new XElement(Cbc + "PriceTypeCode", "01"))),
+            // Descuento por ítem — solo se emite si hay descuento; SUNAT recalcula LineExtensionAmount =
+            // Price*Quantity y lo compara contra el valor declarado (fault 3271), así que sin este elemento
+            // no hay forma de informarle que ese monto ya viene con un descuento restado.
+            linea.MontoDescuento > 0
+                ? new XElement(Cac + "AllowanceCharge",
+                    new XElement(Cbc + "ChargeIndicator", "false"),
+                    new XElement(Cbc + "AllowanceChargeReasonCode", "00"), // Catálogo 53: OTROS DESCUENTOS
+                    new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), linea.MontoDescuento.ToString("F2")),
+                    new XElement(Cbc + "BaseAmount", new XAttribute("currencyID", moneda), (linea.Cantidad * linea.ValorUnitario).ToString("F2")))
+                : null,
             new XElement(Cac + "TaxTotal",
                 new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), linea.MontoIgv.ToString("F2")),
                 new XElement(Cac + "TaxSubtotal",
