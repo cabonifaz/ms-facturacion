@@ -41,4 +41,10 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarEstadoCuotaAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
         EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken);
+
+    /// Para que maximlian3_backend sincronice PEDIDO_FACTURA sondeando EVENTOS_DOCUMENTO desde un checkpoint
+    /// (IdEventoDocumento, monótono — sin comparar fechas). EsAnulacion distingue un Rechazado de sendBill de
+    /// uno de Comunicación de Baja, ya que SUNAT usa el mismo código para ambos.
+    Task<ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>> ListarEventosRecientesAsync(
+        int idInquilino, int ultimoIdEvento, CancellationToken cancellationToken);
 }
