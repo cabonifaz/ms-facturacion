@@ -44,7 +44,7 @@ public sealed class SunatBillServiceCliente(
             contenido.Headers.ContentType = new MediaTypeHeaderValue("text/xml") { CharSet = "utf-8" };
 
             using var solicitud = new HttpRequestMessage(HttpMethod.Post, url) { Content = contenido };
-            solicitud.Headers.TryAddWithoutValidation("SOAPAction", "");
+            solicitud.Headers.TryAddWithoutValidation("SOAPAction", "\"\"");
 
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
