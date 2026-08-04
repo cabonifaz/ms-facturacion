@@ -11,7 +11,8 @@ namespace ms_facturacion.Infraestructura.Sunat;
 /// Envelope SOAP + WS-Security armado a mano (sin WCF) — sigue exactamente el ejemplo real de
 /// facturacion/payload_input_output_sunat.md §2.2/§2.3. El parámetro usuarioSolCompleto ya debe venir
 /// concatenado (EMPRESAS.Ruc + CREDENCIALES_INQUILINO.Usuario) — este cliente no conoce esa regla.
-public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillServiceCliente
+public sealed class SunatBillServiceCliente(
+    HttpClient httpClient, IHostEnvironment entorno, ILogger<SunatBillServiceCliente> logger) : ISunatBillServiceCliente
 {
     private static readonly XNamespace SoapEnv = "http://schemas.xmlsoap.org/soap/envelope/";
     private static readonly XNamespace Ser = "http://service.sunat.gob.pe";
@@ -35,6 +36,13 @@ public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillS
 
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
+
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation(
+                    "sendBill — HTTP {StatusCode}. Respuesta cruda de SUNAT:\n{CuerpoRespuesta}",
+                    (int)respuesta.StatusCode, cuerpoRespuesta);
+            }
 
             if (!respuesta.IsSuccessStatusCode)
             {
