@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
@@ -31,6 +32,11 @@ public sealed class SunatBillServiceCliente(
                 logger.LogInformation(
                     "sendBill — usuarioSolCompleto={UsuarioSolCompleto}, claveSol={ClaveSol}, fileName={NombreArchivoZip}, zipBytes={LongitudZip} bytes.",
                     usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes.Length);
+
+                var rutaDebug = Path.Combine(Path.GetTempPath(), "ms-facturacion-debug", nombreArchivoZip);
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaDebug)!);
+                await File.WriteAllBytesAsync(rutaDebug, zipBytes, cancellationToken);
+                logger.LogInformation("sendBill — ZIP de salida guardado en {RutaDebug} para inspección manual.", rutaDebug);
             }
 
             var sobreEnvio = ConstruirSobreEnvio(usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes);
@@ -40,10 +46,16 @@ public sealed class SunatBillServiceCliente(
                 logger.LogInformation("sendBill — envelope enviado (contraseña redactada):\n{Envelope}", RedactarClave(sobreEnvio));
             }
 
-            using var contenido = new StringContent(sobreEnvio.ToString(SaveOptions.DisableFormatting), Encoding.UTF8, "text/xml");
+            var xmlSobreEnvio = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + sobreEnvio.ToString(SaveOptions.DisableFormatting);
+            using var contenido = new StringContent(xmlSobreEnvio, Encoding.UTF8, "text/xml");
             contenido.Headers.ContentType = new MediaTypeHeaderValue("text/xml") { CharSet = "utf-8" };
 
-            using var solicitud = new HttpRequestMessage(HttpMethod.Post, url) { Content = contenido };
+            using var solicitud = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = contenido,
+                Version = HttpVersion.Version11,
+                VersionPolicy = HttpVersionPolicy.RequestVersionExact
+            };
             solicitud.Headers.TryAddWithoutValidation("SOAPAction", "\"\"");
 
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
