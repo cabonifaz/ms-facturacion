@@ -429,6 +429,46 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>> ListarEventosRecientesAsync(
+        int idInquilino, int ultimoIdEvento, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarEventosRecientes", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intUltimoIdEvento", ultimoIdEvento);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>(idTipoMensaje, mensaje, default);
+            }
+
+            var eventos = new List<EventoDocumentoReciente>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                eventos.Add(new EventoDocumentoReciente(
+                    lector.GetInt32(lector.GetOrdinal("IdEventoDocumento")),
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetInt32(lector.GetOrdinal("IdEstadoNuevoMaestro")),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                    lector.GetInt32(lector.GetOrdinal("EsAnulacion")) == 1));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>.DeExito(mensaje, eventos);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     /// El orden de columnas debe coincidir exactamente con TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION.
     private static DataTable ConstruirTablaLineasEdicion(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas)
     {

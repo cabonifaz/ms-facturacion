@@ -1,5 +1,8 @@
 namespace ms_facturacion.Dominio;
 
+public sealed record EventoDocumentoReciente(
+    int IdEventoDocumento, int IdDocumentoElectronico, int IdEstadoNuevoMaestro, string EstadoCodigo, bool EsAnulacion);
+
 public sealed class DocumentoElectronico
 {
     public required int IdDocumentoElectronico { get; init; }
