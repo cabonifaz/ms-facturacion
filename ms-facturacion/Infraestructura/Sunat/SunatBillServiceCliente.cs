@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Xml.Linq;
@@ -11,7 +12,8 @@ namespace ms_facturacion.Infraestructura.Sunat;
 /// Envelope SOAP + WS-Security armado a mano (sin WCF) — sigue exactamente el ejemplo real de
 /// facturacion/payload_input_output_sunat.md §2.2/§2.3. El parámetro usuarioSolCompleto ya debe venir
 /// concatenado (EMPRESAS.Ruc + CREDENCIALES_INQUILINO.Usuario) — este cliente no conoce esa regla.
-public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillServiceCliente
+public sealed class SunatBillServiceCliente(
+    HttpClient httpClient, IHostEnvironment entorno, ILogger<SunatBillServiceCliente> logger) : ISunatBillServiceCliente
 {
     private static readonly XNamespace SoapEnv = "http://schemas.xmlsoap.org/soap/envelope/";
     private static readonly XNamespace Ser = "http://service.sunat.gob.pe";
@@ -25,16 +27,46 @@ public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillS
     {
         try
         {
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation(
+                    "sendBill — usuarioSolCompleto={UsuarioSolCompleto}, claveSol={ClaveSol}, fileName={NombreArchivoZip}, zipBytes={LongitudZip} bytes.",
+                    usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes.Length);
+
+                var rutaDebug = Path.Combine(Path.GetTempPath(), "ms-facturacion-debug", nombreArchivoZip);
+                Directory.CreateDirectory(Path.GetDirectoryName(rutaDebug)!);
+                await File.WriteAllBytesAsync(rutaDebug, zipBytes, cancellationToken);
+                logger.LogInformation("sendBill — ZIP de salida guardado en {RutaDebug} para inspección manual.", rutaDebug);
+            }
+
             var sobreEnvio = ConstruirSobreEnvio(usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes);
 
-            using var contenido = new StringContent(sobreEnvio.ToString(SaveOptions.DisableFormatting), Encoding.UTF8, "text/xml");
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation("sendBill — envelope enviado (contraseña redactada):\n{Envelope}", RedactarClave(sobreEnvio));
+            }
+
+            var xmlSobreEnvio = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + sobreEnvio.ToString(SaveOptions.DisableFormatting);
+            using var contenido = new StringContent(xmlSobreEnvio, Encoding.UTF8, "text/xml");
             contenido.Headers.ContentType = new MediaTypeHeaderValue("text/xml") { CharSet = "utf-8" };
 
-            using var solicitud = new HttpRequestMessage(HttpMethod.Post, url) { Content = contenido };
-            solicitud.Headers.TryAddWithoutValidation("SOAPAction", "");
+            using var solicitud = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = contenido,
+                Version = HttpVersion.Version11,
+                VersionPolicy = HttpVersionPolicy.RequestVersionExact
+            };
+            solicitud.Headers.TryAddWithoutValidation("SOAPAction", "\"\"");
 
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
+
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation(
+                    "sendBill — HTTP {StatusCode}. Respuesta cruda de SUNAT:\n{CuerpoRespuesta}",
+                    (int)respuesta.StatusCode, cuerpoRespuesta);
+            }
 
             if (!respuesta.IsSuccessStatusCode)
             {
@@ -129,6 +161,27 @@ public sealed class SunatBillServiceCliente(HttpClient httpClient) : ISunatBillS
         }
 
         return EstadoMaestroCodigo.Rechazado;
+    }
+
+    /// Copia el envelope reemplazando la contraseña por "***" y el Base64 del zip por su tamaño — para poder
+    /// loguear la estructura real del envelope (namespaces, orden de elementos) sin exponer la Clave SOL.
+    private static XDocument RedactarClave(XDocument sobreEnvio)
+    {
+        var copia = new XDocument(sobreEnvio);
+
+        var passwordElemento = copia.Descendants(Wsse + "Password").FirstOrDefault();
+        if (passwordElemento is not null)
+        {
+            passwordElemento.Value = "***";
+        }
+
+        var contentFileElemento = copia.Descendants("contentFile").FirstOrDefault();
+        if (contentFileElemento is not null)
+        {
+            contentFileElemento.Value = $"(BASE64 redactado, {contentFileElemento.Value.Length} caracteres)";
+        }
+
+        return copia;
     }
 
     private static byte[] ExtraerXmlDelZip(byte[] zipBytes)
