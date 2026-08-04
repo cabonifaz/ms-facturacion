@@ -29,11 +29,16 @@ public sealed class SunatBillServiceCliente(
             if (entorno.IsDevelopment())
             {
                 logger.LogInformation(
-                    "sendBill — usuarioSolCompleto.Length={LongitudUsuario}, fileName={NombreArchivoZip}, zipBytes={LongitudZip} bytes.",
-                    usuarioSolCompleto.Length, nombreArchivoZip, zipBytes.Length);
+                    "sendBill — usuarioSolCompleto={UsuarioSolCompleto}, claveSol={ClaveSol}, fileName={NombreArchivoZip}, zipBytes={LongitudZip} bytes.",
+                    usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes.Length);
             }
 
             var sobreEnvio = ConstruirSobreEnvio(usuarioSolCompleto, claveSol, nombreArchivoZip, zipBytes);
+
+            if (entorno.IsDevelopment())
+            {
+                logger.LogInformation("sendBill — envelope enviado (contraseña redactada):\n{Envelope}", RedactarClave(sobreEnvio));
+            }
 
             using var contenido = new StringContent(sobreEnvio.ToString(SaveOptions.DisableFormatting), Encoding.UTF8, "text/xml");
             contenido.Headers.ContentType = new MediaTypeHeaderValue("text/xml") { CharSet = "utf-8" };
@@ -144,6 +149,27 @@ public sealed class SunatBillServiceCliente(
         }
 
         return EstadoMaestroCodigo.Rechazado;
+    }
+
+    /// Copia el envelope reemplazando la contraseña por "***" y el Base64 del zip por su tamaño — para poder
+    /// loguear la estructura real del envelope (namespaces, orden de elementos) sin exponer la Clave SOL.
+    private static XDocument RedactarClave(XDocument sobreEnvio)
+    {
+        var copia = new XDocument(sobreEnvio);
+
+        var passwordElemento = copia.Descendants(Wsse + "Password").FirstOrDefault();
+        if (passwordElemento is not null)
+        {
+            passwordElemento.Value = "***";
+        }
+
+        var contentFileElemento = copia.Descendants("contentFile").FirstOrDefault();
+        if (contentFileElemento is not null)
+        {
+            contentFileElemento.Value = $"(BASE64 redactado, {contentFileElemento.Value.Length} caracteres)";
+        }
+
+        return copia;
     }
 
     private static byte[] ExtraerXmlDelZip(byte[] zipBytes)
