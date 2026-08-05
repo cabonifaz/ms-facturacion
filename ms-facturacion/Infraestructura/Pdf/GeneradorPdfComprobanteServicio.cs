@@ -31,6 +31,16 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         ["GBP"] = "LIBRA ESTERLINA"
     };
 
+    // Mismos símbolos sembrados en ms-facturación TABLA_MAESTRA IdMaestro=11.String3 (ver
+    // 03_LlenarTablaMaestra_MsFacturacion.sql) — este generador no tiene acceso a BD, van fijos acá.
+    private static readonly Dictionary<string, string> SimbolosMoneda = new()
+    {
+        ["PEN"] = "S/",
+        ["USD"] = "US$",
+        ["EUR"] = "€",
+        ["GBP"] = "£"
+    };
+
     private static bool _fontResolverConfigurado;
 
     public GeneradorPdfComprobanteServicio()
@@ -67,6 +77,7 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 
         var nombreTipoDocumento = NombresTipoDocumento.GetValueOrDefault(cabecera.TipoDocumentoCodigo, "COMPROBANTE ELECTRONICO");
         var nombreMoneda = NombresMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
+        var simboloMoneda = SimbolosMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
         var establecimiento = $"{empresa.Direccion} {empresa.Distrito}-{empresa.Provincia}-{empresa.Departamento}";
 
         // ===== Cabecera: emisor (izquierda) + recuadro tipo/RUC/serie-correlativo (derecha) =====
@@ -92,13 +103,16 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         gfx.DrawLine(XPens.Black, margen, y, margen + anchoUtil, y);
         y += 8;
 
+        // Las 3 partes (etiqueta/":"/valor) de una misma fila van todas por XRect+TopLeft — mezclar eso con
+        // DrawString(..., XPoint) (que ancla por baseline, no por el techo del texto) hacía que el valor
+        // apareciera ~9pt más abajo que su propia etiqueta, calzando visualmente con la fila siguiente.
         const double anchoEtiqueta = 130;
         void DibujarCampo(string etiqueta, string valor)
         {
-            gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XPoint(margen, y + 9));
-            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XPoint(margen + anchoEtiqueta, y + 9));
+            gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
             gfx.DrawString(valor, fuenteTextoNegrita, XBrushes.Black,
-                new XRect(margen + anchoEtiqueta + 8, y + 9, anchoUtil - anchoEtiqueta - 8, 22), XStringFormats.TopLeft);
+                new XRect(margen + anchoEtiqueta + 8, y, anchoUtil - anchoEtiqueta - 8, 22), XStringFormats.TopLeft);
         }
 
         DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
@@ -125,20 +139,24 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
             gfx.DrawString(encabezados[i], fuenteEncabezadoTabla, XBrushes.Black,
                 new XRect(xCol, y + 3, anchosColumna[i], 12), XStringFormats.TopCenter);
             xCol += anchosColumna[i];
-            if (i < encabezados.Length - 1) gfx.DrawLine(XPens.Black, xCol, y, xCol, y + 16);
         }
         y += 16;
         var yFilasInicio = y;
 
         foreach (var linea in documento.Lineas)
         {
-            var altoFila = Math.Max(14, 10 * (int)Math.Ceiling(linea.Descripcion.Length / 55.0));
+            // PdfSharp solo corta línea en espacios — si la descripción trae una "palabra" (o toda ella)
+            // sin ningún espacio, se dibuja de largo y se sale de la columna hacia Valor Unitario/ICBPER.
+            // RomperPalabrasLargas le mete espacios cada 30 caracteres dentro de cualquier palabra que los
+            // supere, solo para permitir el corte — no altera la descripción real guardada en BD.
+            var descripcionParaImprimir = RomperPalabrasLargas(linea.Descripcion, 30);
+            var altoFila = Math.Max(14, 10 * (int)Math.Ceiling(descripcionParaImprimir.Length / 55.0));
             xCol = margen;
             var valores = new[]
             {
                 linea.Cantidad.ToString("0.###", CultureInfo.InvariantCulture),
                 linea.UnidadMedidaCodigo,
-                linea.Descripcion,
+                descripcionParaImprimir,
                 linea.ValorUnitario.ToString("F2", CultureInfo.InvariantCulture),
                 "0.00"
             };
@@ -161,13 +179,11 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var xTotales = margen + anchoUtil - anchoTotales;
         var anchoGratuitas = anchoUtil - anchoTotales - 15;
 
-        var yBloqueInicio = y;
-
         var altoCajaGratuitas = 24;
         gfx.DrawRectangle(XPens.Black, margen, y, anchoGratuitas, altoCajaGratuitas);
         gfx.DrawString("Valor de Venta de Operaciones Gratuitas :", fuenteTexto, XBrushes.Black,
             new XRect(margen + 4, y + 4, anchoGratuitas * 0.65, 16), XStringFormats.TopLeft);
-        gfx.DrawString($"{(nombreMoneda == "SOL" ? "S/" : "$")} {cabecera.TotalGratuito:F2}", fuenteTextoNegrita, XBrushes.Black,
+        gfx.DrawString($"{simboloMoneda} {cabecera.TotalGratuito:F2}", fuenteTextoNegrita, XBrushes.Black,
             new XRect(margen + anchoGratuitas * 0.65, y + 4, anchoGratuitas * 0.35 - 4, 16), XStringFormats.TopRight);
 
         var ySon = y + altoCajaGratuitas + 14;
@@ -176,37 +192,38 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 
         // Totales (derecha): valor de venta ya viene neto de descuento por línea (ValorLinea), Descuentos
         // acá es solo informativo (el monto ya está reflejado en TotalGravado/Exonerado/Inafecto/Gratuito).
+        // Todas las filas siempre visibles (aunque sean 0.00) — igual que la referencia, que muestra
+        // Anticipos/ISC/ICBPER/Otros Cargos/Otros Tributos/Monto de redondeo aunque valgan cero.
         var subTotalVentas = cabecera.TotalGravado + cabecera.TotalExonerado + cabecera.TotalInafecto + cabecera.TotalGratuito;
-        var filasTotales = new (string Etiqueta, decimal Monto, bool Siempre)[]
+        var filasTotales = new (string Etiqueta, decimal Monto)[]
         {
-            ("Sub Total Ventas", subTotalVentas, true),
-            ("Anticipos", 0, false),
-            ("Descuentos", cabecera.TotalDescuento, false),
-            ("Valor Venta", subTotalVentas, true),
-            ("ISC", cabecera.TotalIsc, false),
-            ("IGV", cabecera.TotalIgv, true),
-            ("ICBPER", 0, false),
-            ("Otros Cargos", cabecera.TotalCargo, false),
-            ("Otros Tributos", cabecera.TotalOtrosTributos, false),
-            ("Monto de redondeo", 0, false),
-            ("Importe Total", cabecera.TotalImporte, true)
+            ("Sub Total Ventas", subTotalVentas),
+            ("Anticipos", 0),
+            ("Descuentos", cabecera.TotalDescuento),
+            ("Valor Venta", subTotalVentas),
+            ("ISC", cabecera.TotalIsc),
+            ("IGV", cabecera.TotalIgv),
+            ("ICBPER", 0),
+            ("Otros Cargos", cabecera.TotalCargo),
+            ("Otros Tributos", cabecera.TotalOtrosTributos),
+            ("Monto de redondeo", 0),
+            ("Importe Total", cabecera.TotalImporte)
         };
 
         var yTotales = y;
         var altoFilaTotal = 13.0;
-        var totalesVisibles = filasTotales.Where(f => f.Siempre || f.Monto != 0).ToList();
-        var altoCajaTotales = totalesVisibles.Count * altoFilaTotal;
+        var altoCajaTotales = filasTotales.Length * altoFilaTotal;
         gfx.DrawRectangle(XPens.Black, xTotales, yTotales, anchoTotales, altoCajaTotales);
 
-        foreach (var (etiqueta, monto, _) in totalesVisibles)
+        foreach (var (etiqueta, monto) in filasTotales)
         {
             var esImporteTotal = etiqueta == "Importe Total";
             var fuente = esImporteTotal ? fuenteTextoNegrita : fuenteTexto;
             gfx.DrawString(etiqueta, fuente, XBrushes.Black,
                 new XRect(xTotales + 4, yTotales + 2, anchoTotales * 0.6, 12), XStringFormats.TopLeft);
-            gfx.DrawString(monto.ToString("F2", CultureInfo.InvariantCulture), fuente, XBrushes.Black,
+            gfx.DrawString($"{simboloMoneda} {monto.ToString("F2", CultureInfo.InvariantCulture)}", fuente, XBrushes.Black,
                 new XRect(xTotales + anchoTotales * 0.6, yTotales + 2, anchoTotales * 0.4 - 4, 12), XStringFormats.TopRight);
-            if (etiqueta != totalesVisibles[^1].Etiqueta)
+            if (etiqueta != filasTotales[^1].Etiqueta)
             {
                 gfx.DrawLine(XPens.LightGray, xTotales, yTotales + altoFilaTotal, xTotales + anchoTotales, yTotales + altoFilaTotal);
             }
@@ -279,6 +296,11 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var numModulos = matriz.Count;
         var ladoModulo = lado / numModulos;
 
+        // Un solo XGraphicsPath con todos los módulos (fusionados por corrida horizontal) y un único
+        // DrawPath — dibujar cada módulo/corrida como su propio DrawRectangle (intento anterior) dejaba
+        // costuras visibles entre rectángulos vecinos al rasterizar el PDF; al ser un solo path con un
+        // solo fill no hay bordes internos que puedan mostrar esa costura.
+        var path = new XGraphicsPath();
         for (var fila = 0; fila < numModulos; fila++)
         {
             var columna = 0;
@@ -294,12 +316,18 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
                 while (columna < numModulos && matriz[fila][columna]) columna++;
                 var anchoCorrida = (columna - inicioCorrida) * ladoModulo;
 
-                // +0.5pt de margen para que corridas de filas vecinas se solapen levemente y no dejen
-                // costura horizontal entre filas (mismo motivo que la fusión por corrida).
-                gfx.DrawRectangle(XBrushes.Black,
-                    x + inicioCorrida * ladoModulo, y + fila * ladoModulo, anchoCorrida, ladoModulo + 0.5);
+                path.AddRectangle(x + inicioCorrida * ladoModulo, y + fila * ladoModulo, anchoCorrida, ladoModulo);
             }
         }
+
+        gfx.DrawPath(XBrushes.Black, path);
+    }
+
+    private static string RomperPalabrasLargas(string texto, int maxLargoPalabra)
+    {
+        var palabras = texto.Split(' ');
+        var partes = palabras.Select(p => p.Length > maxLargoPalabra ? InsertarEspacios(p, maxLargoPalabra) : p);
+        return string.Join(' ', partes);
     }
 
     private static string InsertarEspacios(string valor, int cada)
