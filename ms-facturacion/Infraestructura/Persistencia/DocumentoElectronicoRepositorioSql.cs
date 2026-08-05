@@ -345,6 +345,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                     lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                     lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("MonedaIcono")),
                     lector.GetString(lector.GetOrdinal("EstadoCodigo")),
                     lector.GetString(lector.GetOrdinal("ColorLetra")),
                     lector.GetString(lector.GetOrdinal("ColorFondo"))));
