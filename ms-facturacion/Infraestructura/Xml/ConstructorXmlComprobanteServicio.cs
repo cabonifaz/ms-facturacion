@@ -101,7 +101,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
             ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
-            ConstruirTaxTotal(cabecera, moneda),
+            ConstruirTaxTotal(documento.Lineas, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
         foreach (var linea in documento.Lineas)
@@ -206,17 +206,40 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         }
     }
 
-    private XElement ConstruirTaxTotal(DocumentoElectronico cabecera, string moneda) =>
-        new(Cac + "TaxTotal",
-            new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), cabecera.TotalIgv.ToString("F2", CultureInfo.InvariantCulture)),
-            new XElement(Cac + "TaxSubtotal",
-                new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), cabecera.TotalGravado.ToString("F2", CultureInfo.InvariantCulture)),
-                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), cabecera.TotalIgv.ToString("F2", CultureInfo.InvariantCulture)),
-                new XElement(Cac + "TaxCategory",
-                    new XElement(Cac + "TaxScheme",
-                        new XElement(Cbc + "ID", "1000"),
-                        new XElement(Cbc + "Name", "IGV"),
-                        new XElement(Cbc + "TaxTypeCode", "VAT")))));
+    /// SUNAT exige un cac:TaxSubtotal por cada tributo que aparezca en al menos una línea (fault 2638) —
+    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Gratuito) agrupan por
+    /// Num2/AfectacionIgvCodigo, NO por tributo real: un mismo bucket Gravado puede mezclar líneas con
+    /// tributo 1000 y 9996 a la vez (ver fix de fault 2040), así que no sirven para armar este total —
+    /// hay que agrupar las líneas por su propio TributoSunatCodigo.
+    private XElement ConstruirTaxTotal(IEnumerable<LineaDocumentoElectronico> lineas, string moneda)
+    {
+        var gruposPorTributo = lineas
+            .GroupBy(l => (l.TributoSunatCodigo, l.TributoNombre, l.TributoTaxTypeCode))
+            .Select(g => new
+            {
+                g.Key.TributoSunatCodigo,
+                g.Key.TributoNombre,
+                g.Key.TributoTaxTypeCode,
+                TaxableAmount = g.Sum(l => l.ValorLinea),
+                TaxAmount = g.Sum(l => l.MontoIgv)
+            })
+            .OrderBy(g => g.TributoSunatCodigo)
+            .ToList();
+
+        var totalTaxAmount = gruposPorTributo.Sum(g => g.TaxAmount);
+
+        return new XElement(Cac + "TaxTotal",
+            new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), totalTaxAmount.ToString("F2", CultureInfo.InvariantCulture)),
+            gruposPorTributo.Select(g =>
+                new XElement(Cac + "TaxSubtotal",
+                    new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), g.TaxableAmount.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), g.TaxAmount.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cac + "TaxCategory",
+                        new XElement(Cac + "TaxScheme",
+                            new XElement(Cbc + "ID", g.TributoSunatCodigo),
+                            new XElement(Cbc + "Name", g.TributoNombre),
+                            new XElement(Cbc + "TaxTypeCode", g.TributoTaxTypeCode))))));
+    }
 
     /// Nombre del elemento varía por tipo: LegalMonetaryTotal (Invoice/CreditNote) vs RequestedMonetaryTotal
     /// (DebitNote) — mismos hijos en los tres casos.
