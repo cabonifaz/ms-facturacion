@@ -15,6 +15,11 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoDetalle>> ObtenerAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
+    /// Lectura exclusiva de TokenPublico, para el generador de PDF (URL de verificación en la leyenda) —
+    /// no forma parte de DocumentoElectronico/ObtenerAsync a propósito (ese no debe exponerlo vía API).
+    Task<ResultadoOperacion<string>> ObtenerTokenPublicoAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);

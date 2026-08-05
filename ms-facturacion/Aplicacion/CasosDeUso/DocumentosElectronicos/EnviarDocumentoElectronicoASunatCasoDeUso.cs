@@ -17,6 +17,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     ICredencialInquilinoRepositorio credencialRepositorio,
     ICifradoInquilinoServicio cifradoServicio,
     IConstructorXmlComprobanteServicio constructorXml,
+    IGeneradorPdfComprobanteServicio generadorPdf,
     IFirmadorXmlServicio firmador,
     IProveedorCertificadoServicio proveedorCertificado,
     IEmpaquetadorZipServicio empaquetador,
@@ -125,6 +126,10 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var xmlSinFirmar = constructorXml.Construir(documento.Datos, empresa.Datos);
         var xmlFirmado = firmador.Firmar(xmlSinFirmar, certificado.Datos);
 
+        // "Valor resumen" del QR (Anexo C, RS 113-2018/SUNAT) = ds:DigestValue del XML firmado — nunca se
+        // guardaba en DOCUMENTOS_ELECTRONICOS.SunatHash hasta ahora, se extrae acá recién que existe.
+        var sunatHash = ExtraerDigestValue(xmlFirmado);
+
         // nombreArchivoXml/nombreArchivoZip son el nombre que exige SUNAT (RUC-Tipo-Serie-Correlativo, ver
         // empaquetador.Empaquetar/sunatCliente.EnviarAsync abajo) — no confundir con nombreAlmacenamiento,
         // el nombre bajo el que se guarda en S3, que es un detalle nuestro y puede ser más simple.
@@ -149,7 +154,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         var nuevaTransmision = new NuevaTransmisionSunat(
             cabecera.IdDocumentoElectronico, null, configuracion.Datos.TipoProveedorCodigo,
-            configuracion.Datos.UrlEnvioFacturaBoletaNota, "sendBill", idArchivoZip, 1);
+            configuracion.Datos.UrlEnvioFacturaBoletaNota, "sendBill", idArchivoZip, 1, idArchivoXml);
 
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)
@@ -173,10 +178,22 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var idArchivoCdr = await GuardarYRegistrarArchivoAsync(
             idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
 
+        int? idArchivoPdf = null;
+        if (envio.Datos.EstadoCodigo is EstadoMaestroCodigo.Aceptado or EstadoMaestroCodigo.AceptadoConObservaciones)
+        {
+            var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
+            if (tokenPublico.IdTipoMensaje == TipoMensaje.Exito && tokenPublico.Datos is not null)
+            {
+                var pdfBytes = generadorPdf.Construir(documento.Datos, empresa.Datos, tokenPublico.Datos, sunatHash);
+                idArchivoPdf = await GuardarYRegistrarArchivoAsync(
+                    idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.pdf", pdfBytes, "Pdf", "application/pdf", cancellationToken);
+            }
+        }
+
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
             new ResultadoTransmisionSunat(
-                envio.Datos.EstadoCodigo, idArchivoCdr, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, null),
+                envio.Datos.EstadoCodigo, idArchivoCdr, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, null, idArchivoPdf),
             cancellationToken);
 
         if (envio.Datos.EstadoCodigo != EstadoMaestroCodigo.Aceptado)
@@ -192,7 +209,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         await documentoRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo,
-            null, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
+            sunatHash, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
             cancellationToken);
 
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("Documento procesado por SUNAT.", envio.Datos);
@@ -210,5 +227,14 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
         return resultado.IdTipoMensaje == TipoMensaje.Exito ? resultado.Datos : null;
+    }
+
+    /// "Valor resumen" del QR (Anexo C, RS 113-2018/SUNAT) = ds:DigestValue del XML firmado, en base64 tal
+    /// cual aparece en el nodo — no se recalcula acá, solo se extrae del XML que ya produjo el firmador.
+    private static string? ExtraerDigestValue(byte[] xmlFirmado)
+    {
+        var documento = System.Xml.Linq.XDocument.Load(new MemoryStream(xmlFirmado));
+        System.Xml.Linq.XNamespace ds = "http://www.w3.org/2000/09/xmldsig#";
+        return documento.Descendants(ds + "DigestValue").FirstOrDefault()?.Value;
     }
 }

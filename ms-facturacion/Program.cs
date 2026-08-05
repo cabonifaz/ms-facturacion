@@ -9,6 +9,7 @@ using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 using ms_facturacion.Aplicacion.Puertos;
 using ms_facturacion.Infraestructura.Almacenamiento;
 using ms_facturacion.Infraestructura.Cifrado;
+using ms_facturacion.Infraestructura.Pdf;
 using ms_facturacion.Infraestructura.Persistencia;
 using ms_facturacion.Infraestructura.Seguridad;
 using ms_facturacion.Infraestructura.Sunat;
@@ -59,6 +60,7 @@ builder.Services.AddScoped<IItemLoteDocumentoRepositorio, ItemLoteDocumentoRepos
 
 // Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
 builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlComprobanteServicio>();
+builder.Services.AddScoped<IGeneradorPdfComprobanteServicio, GeneradorPdfComprobanteServicio>();
 builder.Services.AddScoped<IConstructorXmlBajaServicio, ConstructorXmlBajaServicio>();
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
