@@ -8,7 +8,7 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.DocumentosElectronicos;
 public sealed class ObtenerUrlDescargaDocumentoCasoDeUso(
     IArchivoDocumentoRepositorio archivoRepositorio, IAlmacenamientoArchivosServicio almacenamiento)
 {
-    private static readonly TimeSpan VigenciaUrl = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan VigenciaUrl = TimeSpan.FromMinutes(5);
 
     public async Task<ResultadoOperacion<string>> EjecutarAsync(
         int idInquilino, int idDocumentoElectronico, string tipoArchivoCodigo, CancellationToken cancellationToken)
