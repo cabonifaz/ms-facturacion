@@ -48,6 +48,7 @@ public sealed class DocumentosElectronicosController(
     InsertarDocumentoElectronicoCasoDeUso insertarCasoDeUso,
     ObtenerDocumentoElectronicoCasoDeUso obtenerCasoDeUso,
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
+    ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso listarParaPedidoFacturaCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
@@ -146,6 +147,21 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await listarCasoDeUso.EjecutarAsync(
             idInquilino, idEmpresa, estadoCodigo, busqueda, fechaDesde, fechaHasta, pagina, tamanoPagina, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Exclusivo para el listado que maximlian3_backend expone desde PedidoFactura — no reutiliza Listar
+    // (distinto shape/filtros, ver SP_DocumentoElectronico_ListarParaPedidoFactura).
+    [HttpGet("para-pedido-factura")]
+    public async Task<IActionResult> ListarParaPedidoFactura(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] string? estadoCodigo,
+        [FromQuery] int? idFormaPago, [FromQuery] DateOnly? fechaDesde, [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] string? busqueda, [FromQuery] int pagina = 1, [FromQuery] int tamanoPagina = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var resultado = await listarParaPedidoFacturaCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, estadoCodigo, idFormaPago, fechaDesde, fechaHasta, busqueda, pagina, tamanoPagina, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

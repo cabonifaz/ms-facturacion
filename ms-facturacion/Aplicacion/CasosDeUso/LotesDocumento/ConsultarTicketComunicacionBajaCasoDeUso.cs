@@ -108,7 +108,8 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         }
 
         // 0: procesado — guardar CDR, cerrar lote/items/documentos con el resultado real.
-        await GuardarCdrAsync(idInquilino, idLoteDocumento, cabecera.Nombre, consulta.Datos.CdrXmlBytes!, cancellationToken);
+        var carpeta = $"{idInquilino}/{cabecera.IdEmpresa}/{cabecera.FechaReferencia:yyyy}/{cabecera.FechaReferencia:MM}/baja-{cabecera.Nombre}";
+        await GuardarCdrAsync(idInquilino, idLoteDocumento, carpeta, cabecera.Nombre, consulta.Datos.CdrXmlBytes!, cancellationToken);
 
         await loteRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, idLoteDocumento, consulta.Datos.EstadoCodigo, cabecera.Ticket,
@@ -143,10 +144,10 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     }
 
     private async Task GuardarCdrAsync(
-        int idInquilino, int idLoteDocumento, string nombreLote, byte[] cdrXmlBytes, CancellationToken cancellationToken)
+        int idInquilino, int idLoteDocumento, string carpeta, string nombreLote, byte[] cdrXmlBytes, CancellationToken cancellationToken)
     {
-        var nombreArchivo = $"R-{nombreLote}.xml";
-        var ruta = await almacenamiento.GuardarAsync(nombreArchivo, cdrXmlBytes, cancellationToken);
+        var nombreArchivo = $"{nombreLote}-{DateTime.UtcNow:yyyyMMddHHmmss}.cdr";
+        var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, cdrXmlBytes, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(cdrXmlBytes)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(null, idLoteDocumento, "Cdr", nombreArchivo, ruta, "application/xml", hash, cdrXmlBytes.LongLength);

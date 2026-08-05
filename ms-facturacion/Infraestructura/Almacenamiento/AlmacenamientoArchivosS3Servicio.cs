@@ -13,9 +13,9 @@ public sealed class AlmacenamientoArchivosS3Servicio(IAmazonS3 s3Cliente, IConfi
     private string BucketName => configuracion["AWS:BucketName"]
         ?? throw new InvalidOperationException("No se configuró 'AWS:BucketName'.");
 
-    public async Task<string> GuardarAsync(string nombreArchivo, byte[] contenido, CancellationToken cancellationToken)
+    public async Task<string> GuardarAsync(string carpeta, string nombreArchivo, byte[] contenido, CancellationToken cancellationToken)
     {
-        var clave = $"documentos-electronicos/{nombreArchivo}";
+        var clave = $"documentos-electronicos/{carpeta}/{nombreArchivo}";
 
         using var contenidoStream = new MemoryStream(contenido);
         var solicitud = new PutObjectRequest

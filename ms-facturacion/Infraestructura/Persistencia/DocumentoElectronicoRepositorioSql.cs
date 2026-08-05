@@ -213,6 +213,38 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<string>> ObtenerTokenPublicoAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerTokenPublico", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<string>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            var tokenPublico = lector.GetString(lector.GetOrdinal("TokenPublico"));
+
+            return ResultadoOperacion<string>.DeExito(mensaje, tokenPublico);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<string>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken)
@@ -266,6 +298,64 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         catch (Exception ex)
         {
             return ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>> ListarParaPedidoFacturaAsync(
+        int idInquilino, int idEmpresa, string? estadoCodigo, int? idFormaPago, DateOnly? fechaDesde, DateOnly? fechaHasta,
+        string? busqueda, int numeroPagina, int tamanoPagina, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarParaPedidoFactura", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@vchEstadoCodigo", (object?)estadoCodigo ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+            var totalRegistros = lector.GetInt32(lector.GetOrdinal("TotalRegistros"));
+            var totalPaginas = lector.GetInt32(lector.GetOrdinal("TotalPaginas"));
+
+            await lector.NextResultAsync(cancellationToken);
+            var items = new List<FacturaResumenPedidoFactura>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                items.Add(new FacturaResumenPedidoFactura(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("NumeroFactura")),
+                    lector.GetString(lector.GetOrdinal("ClienteNombre")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                    lector.GetString(lector.GetOrdinal("ColorLetra")),
+                    lector.GetString(lector.GetOrdinal("ColorFondo"))));
+            }
+
+            var paginado = new ResultadoPaginado<FacturaResumenPedidoFactura>(totalRegistros, totalPaginas, items);
+            return ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>.DeExito(mensaje, paginado);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>.DeErrorSistema(ex.Message);
         }
     }
 
