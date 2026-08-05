@@ -125,15 +125,25 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var xmlSinFirmar = constructorXml.Construir(documento.Datos, empresa.Datos);
         var xmlFirmado = firmador.Firmar(xmlSinFirmar, certificado.Datos);
 
+        // nombreArchivoXml/nombreArchivoZip son el nombre que exige SUNAT (RUC-Tipo-Serie-Correlativo, ver
+        // empaquetador.Empaquetar/sunatCliente.EnviarAsync abajo) — no confundir con nombreAlmacenamiento,
+        // el nombre bajo el que se guarda en S3, que es un detalle nuestro y puede ser más simple.
         var nombreBase = $"{empresa.Datos.Ruc}-{cabecera.TipoDocumentoCodigo}-{cabecera.Serie}-{cabecera.Correlativo}";
         var nombreArchivoXml = $"{nombreBase}.xml";
         var nombreArchivoZip = $"{nombreBase}.zip";
         var zipBytes = empaquetador.Empaquetar(nombreArchivoXml, xmlFirmado);
 
+        var carpeta = $"{idInquilino}/{cabecera.IdEmpresa}/{cabecera.FechaEmision:yyyy}/{cabecera.FechaEmision:MM}/{cabecera.Serie}-{cabecera.Correlativo}";
+
+        // Timestamp al final: cada intento de envío recibe su propio nombre, así un reintento no sobreescribe
+        // en S3 el XML/ZIP/CDR del intento anterior (misma clave = mismo objeto). Compartido entre los 3
+        // archivos de este intento (xml/zip acá, cdr más abajo) para que se lean como un mismo conjunto.
+        var nombreAlmacenamiento = $"{cabecera.Serie}-{cabecera.Correlativo}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+
         var idArchivoXml = await GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, nombreArchivoXml, xmlFirmado, "Xml", "application/xml", cancellationToken);
+            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
         var idArchivoZip = await GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, nombreArchivoZip, zipBytes, "Zip", "application/zip", cancellationToken);
+            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
 
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
@@ -161,7 +171,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         }
 
         var idArchivoCdr = await GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, $"R-{nombreBase}.xml", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
+            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
 
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
@@ -189,10 +199,10 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     }
 
     private async Task<int?> GuardarYRegistrarArchivoAsync(
-        int idInquilino, int idDocumentoElectronico, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
+        int idInquilino, int idDocumentoElectronico, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
         string tipoContenido, CancellationToken cancellationToken)
     {
-        var ruta = await almacenamiento.GuardarAsync(nombreArchivo, contenido, cancellationToken);
+        var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, contenido, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(contenido)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(

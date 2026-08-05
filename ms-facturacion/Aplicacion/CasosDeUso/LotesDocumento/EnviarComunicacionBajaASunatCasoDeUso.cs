@@ -87,8 +87,10 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         var zipBytes = empaquetador.Empaquetar(nombreArchivoXml, xmlFirmado);
 
         var idLoteDocumento = lote.Datos.Cabecera.IdLoteDocumento;
-        await GuardarArchivoAsync(idInquilino, idLoteDocumento, nombreArchivoXml, xmlFirmado, "Xml", "application/xml", cancellationToken);
-        var idArchivoZip = await GuardarArchivoAsync(idInquilino, idLoteDocumento, nombreArchivoZip, zipBytes, "Zip", "application/zip", cancellationToken);
+        var carpeta = $"{idInquilino}/{idEmpresa}/{fechaReferencia:yyyy}/{fechaReferencia:MM}/baja-{lote.Datos.Cabecera.Nombre}";
+        var nombreAlmacenamiento = $"{lote.Datos.Cabecera.Nombre}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        await GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
+        var idArchivoZip = await GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
 
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
@@ -130,10 +132,10 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
     }
 
     private async Task<int> GuardarArchivoAsync(
-        int idInquilino, int idLoteDocumento, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
+        int idInquilino, int idLoteDocumento, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
         string tipoContenido, CancellationToken cancellationToken)
     {
-        var ruta = await almacenamiento.GuardarAsync(nombreArchivo, contenido, cancellationToken);
+        var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, contenido, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(contenido)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(null, idLoteDocumento, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);

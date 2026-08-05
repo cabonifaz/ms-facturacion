@@ -5,5 +5,7 @@ namespace ms_facturacion.Aplicacion.Puertos;
 /// sistema solo conoce esta interfaz.
 public interface IAlmacenamientoArchivosServicio
 {
-    Task<string> GuardarAsync(string nombreArchivo, byte[] contenido, CancellationToken cancellationToken);
+    /// carpeta = ruta relativa dentro de "documentos-electronicos/" (idInquilino/idEmpresa/año/mes/serie-correlativo
+    /// o .../baja-{nombreLote}) — cada llamador arma la suya, el adaptador solo concatena.
+    Task<string> GuardarAsync(string carpeta, string nombreArchivo, byte[] contenido, CancellationToken cancellationToken);
 }
