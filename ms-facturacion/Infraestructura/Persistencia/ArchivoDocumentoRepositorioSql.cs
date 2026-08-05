@@ -53,6 +53,43 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
         }
     }
 
+    public async Task<ResultadoOperacion<ArchivoDescarga>> ObtenerXmlOPdfAsync(
+        int idInquilino, int idDocumentoElectronico, string tipoArchivoCodigo, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_ArchivoDocumento_ObtenerXmlYPdf", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@vchTipoArchivoCodigo", tipoArchivoCodigo);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<ArchivoDescarga>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var archivo = new ArchivoDescarga(
+                lector.GetString(lector.GetOrdinal("NombreArchivo")),
+                lector.GetString(lector.GetOrdinal("RutaAlmacenamiento")),
+                lector.GetString(lector.GetOrdinal("TipoContenido")));
+
+            return ResultadoOperacion<ArchivoDescarga>.DeExito(mensaje, archivo);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<ArchivoDescarga>.DeErrorSistema(ex.Message);
+        }
+    }
+
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
         SqlDataReader lector, CancellationToken cancellationToken)
     {

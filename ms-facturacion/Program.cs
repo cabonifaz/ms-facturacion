@@ -95,6 +95,7 @@ builder.Services.AddScoped<InsertarDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso>();
+builder.Services.AddScoped<ObtenerUrlDescargaDocumentoCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();

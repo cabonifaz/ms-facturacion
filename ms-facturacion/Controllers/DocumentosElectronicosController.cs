@@ -54,6 +54,7 @@ public sealed class DocumentosElectronicosController(
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
     ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
+    ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -136,6 +137,15 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
         var resultado = await obtenerCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // tipoArchivo: "Xml" o "Pdf". Devuelve una URL presignada de S3 (vigencia 15 min), no el archivo en sí.
+    [HttpGet("{idDocumentoElectronico:int}/url-descarga")]
+    public async Task<IActionResult> ObtenerUrlDescarga(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerUrlDescargaCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, tipoArchivo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

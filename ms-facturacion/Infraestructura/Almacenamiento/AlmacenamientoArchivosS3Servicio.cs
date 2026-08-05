@@ -30,4 +30,21 @@ public sealed class AlmacenamientoArchivosS3Servicio(IAmazonS3 s3Cliente, IConfi
 
         return clave;
     }
+
+    public string GenerarUrlDescarga(string ruta, string nombreArchivo, TimeSpan vigencia)
+    {
+        var solicitud = new GetPreSignedUrlRequest
+        {
+            BucketName = BucketName,
+            Key = ruta,
+            Expires = DateTime.UtcNow.Add(vigencia),
+            Verb = HttpVerb.GET,
+            ResponseHeaderOverrides = new ResponseHeaderOverrides
+            {
+                ContentDisposition = $"attachment; filename=\"{nombreArchivo}\""
+            }
+        };
+
+        return s3Cliente.GetPreSignedURL(solicitud);
+    }
 }
