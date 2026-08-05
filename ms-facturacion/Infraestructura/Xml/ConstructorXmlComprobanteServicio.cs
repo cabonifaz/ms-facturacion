@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml.Linq;
 using ms_facturacion.Aplicacion.Puertos;
 using ms_facturacion.Dominio;
@@ -100,7 +101,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
             ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
-            ConstruirTaxTotal(cabecera, moneda),
+            ConstruirTaxTotal(documento.Lineas, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
         foreach (var linea in documento.Lineas)
@@ -193,29 +194,52 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         yield return new XElement(Cac + "PaymentTerms",
             new XElement(Cbc + "ID", "FormaPago"),
             new XElement(Cbc + "PaymentMeansID", "Credito"),
-            new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), totalImporte.ToString("F2")));
+            new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), totalImporte.ToString("F2", CultureInfo.InvariantCulture)));
 
         foreach (var cuota in cuotas)
         {
             yield return new XElement(Cac + "PaymentTerms",
                 new XElement(Cbc + "ID", "FormaPago"),
                 new XElement(Cbc + "PaymentMeansID", $"Cuota{cuota.NumeroCuota:000}"),
-                new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), cuota.Monto.ToString("F2")),
+                new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), cuota.Monto.ToString("F2", CultureInfo.InvariantCulture)),
                 new XElement(Cbc + "PaymentDueDate", cuota.FechaVencimiento.ToString("yyyy-MM-dd")));
         }
     }
 
-    private XElement ConstruirTaxTotal(DocumentoElectronico cabecera, string moneda) =>
-        new(Cac + "TaxTotal",
-            new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), cabecera.TotalIgv.ToString("F2")),
-            new XElement(Cac + "TaxSubtotal",
-                new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), cabecera.TotalGravado.ToString("F2")),
-                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), cabecera.TotalIgv.ToString("F2")),
-                new XElement(Cac + "TaxCategory",
-                    new XElement(Cac + "TaxScheme",
-                        new XElement(Cbc + "ID", "1000"),
-                        new XElement(Cbc + "Name", "IGV"),
-                        new XElement(Cbc + "TaxTypeCode", "VAT")))));
+    /// SUNAT exige un cac:TaxSubtotal por cada tributo que aparezca en al menos una línea (fault 2638) —
+    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Gratuito) agrupan por
+    /// Num2/AfectacionIgvCodigo, NO por tributo real: un mismo bucket Gravado puede mezclar líneas con
+    /// tributo 1000 y 9996 a la vez (ver fix de fault 2040), así que no sirven para armar este total —
+    /// hay que agrupar las líneas por su propio TributoSunatCodigo.
+    private XElement ConstruirTaxTotal(IEnumerable<LineaDocumentoElectronico> lineas, string moneda)
+    {
+        var gruposPorTributo = lineas
+            .GroupBy(l => (l.TributoSunatCodigo, l.TributoNombre, l.TributoTaxTypeCode))
+            .Select(g => new
+            {
+                g.Key.TributoSunatCodigo,
+                g.Key.TributoNombre,
+                g.Key.TributoTaxTypeCode,
+                TaxableAmount = g.Sum(l => l.ValorLinea),
+                TaxAmount = g.Sum(l => l.MontoIgv)
+            })
+            .OrderBy(g => g.TributoSunatCodigo)
+            .ToList();
+
+        var totalTaxAmount = gruposPorTributo.Sum(g => g.TaxAmount);
+
+        return new XElement(Cac + "TaxTotal",
+            new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), totalTaxAmount.ToString("F2", CultureInfo.InvariantCulture)),
+            gruposPorTributo.Select(g =>
+                new XElement(Cac + "TaxSubtotal",
+                    new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), g.TaxableAmount.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), g.TaxAmount.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cac + "TaxCategory",
+                        new XElement(Cac + "TaxScheme",
+                            new XElement(Cbc + "ID", g.TributoSunatCodigo),
+                            new XElement(Cbc + "Name", g.TributoNombre),
+                            new XElement(Cbc + "TaxTypeCode", g.TributoTaxTypeCode))))));
+    }
 
     /// Nombre del elemento varía por tipo: LegalMonetaryTotal (Invoice/CreditNote) vs RequestedMonetaryTotal
     /// (DebitNote) — mismos hijos en los tres casos.
@@ -224,19 +248,19 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalGratuito;
 
         return new XElement(Cac + elementoTotalMonetario,
-            new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), lineExtensionAmount.ToString("F2")),
-            new XElement(Cbc + "TaxInclusiveAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2")),
-            new XElement(Cbc + "PayableAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2")));
+            new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), lineExtensionAmount.ToString("F2", CultureInfo.InvariantCulture)),
+            new XElement(Cbc + "TaxInclusiveAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2", CultureInfo.InvariantCulture)),
+            new XElement(Cbc + "PayableAmount", new XAttribute("currencyID", moneda), cabecera.TotalImporte.ToString("F2", CultureInfo.InvariantCulture)));
     }
 
     private XElement ConstruirLinea(string elementoLinea, string elementoCantidad, LineaDocumentoElectronico linea, string moneda) =>
         new(Cac + elementoLinea,
             new XElement(Cbc + "ID", linea.NumeroLinea),
             new XElement(Cbc + elementoCantidad, new XAttribute("unitCode", linea.UnidadMedidaCodigo), linea.Cantidad),
-            new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), linea.ValorLinea.ToString("F2")),
+            new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), linea.ValorLinea.ToString("F2", CultureInfo.InvariantCulture)),
             new XElement(Cac + "PricingReference",
                 new XElement(Cac + "AlternativeConditionPrice",
-                    new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.PrecioUnitario.ToString("F6")),
+                    new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.PrecioUnitario.ToString("F6", CultureInfo.InvariantCulture)),
                     new XElement(Cbc + "PriceTypeCode", "01"))),
             // Descuento por ítem — solo se emite si hay descuento; SUNAT recalcula LineExtensionAmount =
             // Price*Quantity y lo compara contra el valor declarado (fault 3271), así que sin este elemento
@@ -245,14 +269,14 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                 ? new XElement(Cac + "AllowanceCharge",
                     new XElement(Cbc + "ChargeIndicator", "false"),
                     new XElement(Cbc + "AllowanceChargeReasonCode", "00"), // Catálogo 53: OTROS DESCUENTOS
-                    new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), linea.MontoDescuento.ToString("F2")),
-                    new XElement(Cbc + "BaseAmount", new XAttribute("currencyID", moneda), (linea.Cantidad * linea.ValorUnitario).ToString("F2")))
+                    new XElement(Cbc + "Amount", new XAttribute("currencyID", moneda), linea.MontoDescuento.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cbc + "BaseAmount", new XAttribute("currencyID", moneda), (linea.Cantidad * linea.ValorUnitario).ToString("F2", CultureInfo.InvariantCulture)))
                 : null,
             new XElement(Cac + "TaxTotal",
-                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), linea.MontoIgv.ToString("F2")),
+                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), linea.MontoIgv.ToString("F2", CultureInfo.InvariantCulture)),
                 new XElement(Cac + "TaxSubtotal",
-                    new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), linea.ValorLinea.ToString("F2")),
-                    new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), linea.MontoIgv.ToString("F2")),
+                    new XElement(Cbc + "TaxableAmount", new XAttribute("currencyID", moneda), linea.ValorLinea.ToString("F2", CultureInfo.InvariantCulture)),
+                    new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", moneda), linea.MontoIgv.ToString("F2", CultureInfo.InvariantCulture)),
                     new XElement(Cac + "TaxCategory",
                         new XElement(Cbc + "ID", linea.TributoCategoria),
                         new XElement(Cbc + "Percent", linea.PorcentajeIgv),
@@ -265,5 +289,5 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                 new XElement(Cbc + "Description", linea.Descripcion),
                 new XElement(Cac + "SellersItemIdentification", new XElement(Cbc + "ID", linea.ProductoCodigo))),
             new XElement(Cac + "Price",
-                new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.ValorUnitario.ToString("F6"))));
+                new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.ValorUnitario.ToString("F6", CultureInfo.InvariantCulture))));
 }
