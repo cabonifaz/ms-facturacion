@@ -140,7 +140,7 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
-    // tipoArchivo: "Xml" o "Pdf". Devuelve una URL presignada de S3 (vigencia 15 min), no el archivo en sí.
+    // tipoArchivo: "Xml" o "Pdf". Devuelve una URL presignada de S3 (vigencia 5 min), no el archivo en sí.
     [HttpGet("{idDocumentoElectronico:int}/url-descarga")]
     public async Task<IActionResult> ObtenerUrlDescarga(
         [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
