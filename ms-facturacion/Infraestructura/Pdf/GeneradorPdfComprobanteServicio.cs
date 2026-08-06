@@ -78,21 +78,23 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var nombreTipoDocumento = NombresTipoDocumento.GetValueOrDefault(cabecera.TipoDocumentoCodigo, "COMPROBANTE ELECTRONICO");
         var nombreMoneda = NombresMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
         var simboloMoneda = SimbolosMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
-        var establecimiento = $"{empresa.Direccion} {empresa.Distrito}-{empresa.Provincia}-{empresa.Departamento}";
+        var ciudadEmpresa = $"{empresa.Distrito}-{empresa.Provincia}-{empresa.Departamento}";
 
         // ===== Cabecera: emisor (izquierda) + recuadro tipo/RUC/serie-correlativo (derecha) =====
         var anchoRecuadro = XUnit.FromMillimeter(65).Point;
         var xRecuadro = margen + anchoUtil - anchoRecuadro;
 
         gfx.DrawString(empresa.RazonSocial, fuenteTitulo, XBrushes.Black, new XPoint(margen, y + 10));
-        gfx.DrawString(establecimiento, fuenteTexto, XBrushes.Black,
-            new XRect(margen, y + 16, anchoUtil - anchoRecuadro - 10, 26), XStringFormats.TopLeft);
+        gfx.DrawString(empresa.Direccion, fuenteTexto, XBrushes.Black,
+            new XRect(margen, y + 16, anchoUtil - anchoRecuadro - 10, 12), XStringFormats.TopLeft);
+        gfx.DrawString(ciudadEmpresa, fuenteTexto, XBrushes.Black,
+            new XRect(margen, y + 25, anchoUtil - anchoRecuadro - 10, 12), XStringFormats.TopLeft);
 
         var altoRecuadro = XUnit.FromMillimeter(22).Point;
         gfx.DrawRectangle(XPens.Black, xRecuadro, y, anchoRecuadro, altoRecuadro);
         gfx.DrawString(nombreTipoDocumento, fuenteSubtitulo, XBrushes.Black,
             new XRect(xRecuadro, y + 5, anchoRecuadro, 14), XStringFormats.TopCenter);
-        gfx.DrawString($"RUC: {empresa.Ruc}", fuenteTexto, XBrushes.Black,
+        gfx.DrawString($"RUC: {empresa.Ruc}", fuenteTextoNegrita, XBrushes.Black,
             new XRect(xRecuadro, y + 20, anchoRecuadro, 14), XStringFormats.TopCenter);
         gfx.DrawString($"{cabecera.Serie}-{cabecera.Correlativo}", fuenteSubtitulo, XBrushes.Black,
             new XRect(xRecuadro, y + 34, anchoRecuadro, 16), XStringFormats.TopCenter);
@@ -115,14 +117,24 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
                 new XRect(margen + anchoEtiqueta + 8, y, anchoUtil - anchoEtiqueta - 8, 22), XStringFormats.TopLeft);
         }
 
+        // Dirección y distrito-provincia-departamento van en líneas separadas (no concatenadas en un solo
+        // valor) para que calcen con la representación impresa de referencia de SUNAT.
+        void DibujarCampoDosLineas(string etiqueta, string valorLinea1, string valorLinea2)
+        {
+            gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
+            gfx.DrawString(valorLinea1, fuenteTextoNegrita, XBrushes.Black,
+                new XRect(margen + anchoEtiqueta + 8, y, anchoUtil - anchoEtiqueta - 8, 12), XStringFormats.TopLeft);
+            gfx.DrawString(valorLinea2, fuenteTextoNegrita, XBrushes.Black,
+                new XRect(margen + anchoEtiqueta + 8, y + 11, anchoUtil - anchoEtiqueta - 8, 12), XStringFormats.TopLeft);
+        }
+
         DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
         y += 12;
         DibujarCampo("Señor(es)", cabecera.ClienteNombre);
         y += 12;
-        DibujarCampo($"{DescripcionTipoDocumentoCliente(cabecera.ClienteTipoDocumentoCodigo)}", cabecera.ClienteNumeroDocumento);
-        y += 12;
-        DibujarCampo("Establecimiento del Emisor", establecimiento);
-        y += 20;
+        DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa);
+        y += 24;
         DibujarCampo("Tipo de Moneda", nombreMoneda);
         y += 12;
         DibujarCampo("Observación", cabecera.NumeroReferencia ?? "");
@@ -288,8 +300,10 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         // Alto calculado a partir de las líneas reales (EnvolverTexto) en vez de un valor fijo: a un largo
         // fijo, si nombreTipoDocumento cambia (o la traducción del texto crece), el texto puede necesitar
         // más líneas de las previstas y se sale por debajo del recuadro.
+        // SUNAT no genera esta representación impresa — la genera el propio emisor (este servicio), SUNAT
+        // solo valida/almacena el XML y devuelve el CDR. Decir "generada en el Sistema de SUNAT" era falso.
         var textoLeyendaFinal =
-            $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}, generada en el Sistema de SUNAT. " +
+            $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}. " +
             "Puede verificarla utilizando el código de verificación indicado arriba.";
         var anchoLeyendaFinal = anchoUtil - 12;
         var lineasLeyendaFinal = EnvolverTexto(gfx, fuenteTextoChico, textoLeyendaFinal, anchoLeyendaFinal);
@@ -430,11 +444,4 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         }
         return string.Join(' ', partes);
     }
-
-    private static string DescripcionTipoDocumentoCliente(string codigo) => codigo switch
-    {
-        "6" => "RUC",
-        "1" => "DNI",
-        _ => "Documento"
-    };
 }
