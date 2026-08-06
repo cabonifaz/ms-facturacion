@@ -199,12 +199,24 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         if (envio.Datos.EstadoCodigo != EstadoMaestroCodigo.Aceptado)
         {
             var severidad = envio.Datos.EstadoCodigo == EstadoMaestroCodigo.Rechazado ? "Error" : "Advertencia";
-            await errorRepositorio.InsertarAsync(
-                UsuarioWorker, idInquilino,
-                new ErrorDocumento(
-                    cabecera.IdDocumentoElectronico, transmision.Datos, "Sunat",
-                    envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, severidad),
-                cancellationToken);
+
+            // Cuando el CDR trae observaciones (cbc:Note) se guarda una fila por cada una — antes solo se
+            // guardaba la Description principal y el resto de observaciones se perdía. Si no hay Note (caso
+            // típico de un Rechazado simple, sin lista de observaciones), se conserva el comportamiento
+            // anterior: una sola fila con el código/descripción principal del Response.
+            var mensajes = envio.Datos.Observaciones.Count > 0
+                ? envio.Datos.Observaciones
+                : [envio.Datos.SunatDescripcionRespuesta];
+
+            foreach (var mensaje in mensajes)
+            {
+                await errorRepositorio.InsertarAsync(
+                    UsuarioWorker, idInquilino,
+                    new ErrorDocumento(
+                        cabecera.IdDocumentoElectronico, transmision.Datos, "Sunat",
+                        envio.Datos.SunatCodigoRespuesta, mensaje, null, severidad),
+                    cancellationToken);
+            }
         }
 
         await documentoRepositorio.ActualizarEstadoSunatAsync(

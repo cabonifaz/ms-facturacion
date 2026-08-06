@@ -104,6 +104,7 @@ builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ListarEventosRecientesCasoDeUso>();
+builder.Services.AddScoped<ListarErroresUltimoEnvioCasoDeUso>();
 
 // Casos de Uso — Certificado
 builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();

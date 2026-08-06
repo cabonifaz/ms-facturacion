@@ -54,6 +54,7 @@ public sealed class DocumentosElectronicosController(
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
     ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
+    ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
@@ -238,6 +239,16 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, [FromQuery] int ultimoIdEvento, CancellationToken cancellationToken)
     {
         var resultado = await listarEventosRecientesCasoDeUso.EjecutarAsync(idInquilino, ultimoIdEvento, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Solo los errores/observaciones del último intento de envío a SUNAT (no el historial completo de
+    // reintentos anteriores) — ver SP_ErrorDocumento_ListarUltimoEnvio.
+    [HttpGet("{idDocumentoElectronico:int}/errores-ultimo-envio")]
+    public async Task<IActionResult> ListarErroresUltimoEnvio(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await listarErroresUltimoEnvioCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
