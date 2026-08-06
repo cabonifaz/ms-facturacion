@@ -1,3 +1,4 @@
+using ms_facturacion.Aplicacion.CasosDeUso.CamposExtraDocumentoElectronico;
 using ms_facturacion.Aplicacion.CasosDeUso.Certificados;
 using ms_facturacion.Aplicacion.CasosDeUso.ConfiguracionesFacturacionEmpresa;
 using ms_facturacion.Aplicacion.CasosDeUso.Credenciales;
@@ -57,6 +58,7 @@ builder.Services.AddScoped<ITransmisionSunatRepositorio, TransmisionSunatReposit
 builder.Services.AddScoped<IErrorDocumentoRepositorio, ErrorDocumentoRepositorioSql>();
 builder.Services.AddScoped<ILoteDocumentoRepositorio, LoteDocumentoRepositorioSql>();
 builder.Services.AddScoped<IItemLoteDocumentoRepositorio, ItemLoteDocumentoRepositorioSql>();
+builder.Services.AddScoped<ICampoExtraDocumentoElectronicoRepositorio, CampoExtraDocumentoElectronicoRepositorioSql>();
 
 // Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
 builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlComprobanteServicio>();
@@ -108,6 +110,11 @@ builder.Services.AddScoped<ListarErroresUltimoEnvioCasoDeUso>();
 
 // Casos de Uso — Certificado
 builder.Services.AddScoped<InsertarCertificadoCasoDeUso>();
+builder.Services.AddScoped<InsertarCampoExtraDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<InsertarLoteCamposExtraDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ListarCamposExtraDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ActualizarCampoExtraDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<EliminarCampoExtraDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerCertificadoCasoDeUso>();
 builder.Services.AddScoped<ListarCertificadosCasoDeUso>();
 builder.Services.AddScoped<ActualizarCertificadoCasoDeUso>();
