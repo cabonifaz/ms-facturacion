@@ -11,6 +11,13 @@ public sealed class FuenteEmbebidaResolver : IFontResolver
 {
     public const string NombreFamilia = "Ubuntu";
 
+    // Familia aparte para negrita, en vez de depender del flag isBold de ResolveTypeface: con una sola
+    // familia "Ubuntu" + isBold, PdfSharp terminaba embebiendo un único recurso de fuente (Ubuntu Regular)
+    // para toda la página — cualquier XFont con XFontStyleEx.Bold se veía en la práctica igual que el
+    // regular. Pidiendo directamente la familia "Ubuntu-Bold" se evita esa resolución de estilo y el TTF
+    // en negrita queda embebido de verdad.
+    public const string NombreFamiliaBold = "Ubuntu-Bold";
+
     private static readonly Lazy<byte[]> Regular = new(() => LeerRecurso("Ubuntu-Regular.ttf"));
     private static readonly Lazy<byte[]> Bold = new(() => LeerRecurso("Ubuntu-Bold.ttf"));
 
@@ -18,12 +25,12 @@ public sealed class FuenteEmbebidaResolver : IFontResolver
 
     public byte[] GetFont(string faceName) => faceName switch
     {
-        $"{NombreFamilia}#b" => Bold.Value,
+        NombreFamiliaBold => Bold.Value,
         _ => Regular.Value
     };
 
     public FontResolverInfo ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
-        new(isBold ? $"{NombreFamilia}#b" : NombreFamilia);
+        new(familyName == NombreFamiliaBold ? NombreFamiliaBold : NombreFamilia);
 
     private static byte[] LeerRecurso(string nombreArchivo)
     {

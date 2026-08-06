@@ -63,12 +63,12 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         pagina.Height = XUnit.FromMillimeter(297);
         using var gfx = XGraphics.FromPdfPage(pagina);
 
-        var fuenteTitulo = new XFont(FuenteEmbebidaResolver.NombreFamilia, 13, XFontStyleEx.Bold);
-        var fuenteSubtitulo = new XFont(FuenteEmbebidaResolver.NombreFamilia, 10, XFontStyleEx.Bold);
+        var fuenteTitulo = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 13, XFontStyleEx.Regular);
+        var fuenteSubtitulo = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 10, XFontStyleEx.Regular);
         var fuenteTexto = new XFont(FuenteEmbebidaResolver.NombreFamilia, 8.5, XFontStyleEx.Regular);
-        var fuenteTextoNegrita = new XFont(FuenteEmbebidaResolver.NombreFamilia, 8.5, XFontStyleEx.Bold);
+        var fuenteTextoNegrita = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 8.5, XFontStyleEx.Regular);
         var fuenteTextoChico = new XFont(FuenteEmbebidaResolver.NombreFamilia, 7.5, XFontStyleEx.Regular);
-        var fuenteEncabezadoTabla = new XFont(FuenteEmbebidaResolver.NombreFamilia, 8, XFontStyleEx.Bold);
+        var fuenteEncabezadoTabla = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 8, XFontStyleEx.Regular);
 
         var margen = XUnit.FromMillimeter(12).Point;
         var anchoUtil = pagina.Width.Point - 2 * margen;
@@ -150,7 +150,9 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
             // RomperPalabrasLargas le mete espacios cada 30 caracteres dentro de cualquier palabra que los
             // supere, solo para permitir el corte — no altera la descripción real guardada en BD.
             var descripcionParaImprimir = RomperPalabrasLargas(linea.Descripcion, 30);
-            var altoFila = Math.Max(14, 10 * (int)Math.Ceiling(descripcionParaImprimir.Length / 55.0));
+            var anchoDescripcion = anchosColumna[2] - 6;
+            var lineasDescripcion = ContarLineas(gfx, fuenteTextoChico, descripcionParaImprimir, anchoDescripcion);
+            var altoFila = Math.Max(14, lineasDescripcion * 10 + 4);
             xCol = margen;
             var valores = new[]
             {
@@ -273,14 +275,18 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         y += ladoQr + 12;
 
         // ===== Leyenda final =====
-        // A 7.5pt la oración completa ocupa 2 líneas dentro del ancho útil — el recuadro necesita alto
-        // suficiente para ambas, si no el texto se sale por debajo del borde.
-        var altoLeyenda = 36.0;
-        gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, altoLeyenda);
-        gfx.DrawString(
+        // Alto calculado con ContarLineas en vez de un valor fijo: a un largo fijo, si nombreTipoDocumento
+        // cambia (o la traducción del texto crece), el texto puede necesitar más líneas de las previstas y
+        // se sale por debajo del recuadro.
+        var textoLeyendaFinal =
             $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}, generada en el Sistema de SUNAT. " +
-            "Puede verificarla utilizando el código de verificación indicado arriba.",
-            fuenteTextoChico, XBrushes.Black, new XRect(margen + 6, y + 6, anchoUtil - 12, altoLeyenda - 8), XStringFormats.TopLeft);
+            "Puede verificarla utilizando el código de verificación indicado arriba.";
+        var anchoLeyendaFinal = anchoUtil - 12;
+        var lineasLeyendaFinal = ContarLineas(gfx, fuenteTextoChico, textoLeyendaFinal, anchoLeyendaFinal);
+        var altoLeyenda = lineasLeyendaFinal * 10 + 12;
+        gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, altoLeyenda);
+        gfx.DrawString(textoLeyendaFinal, fuenteTextoChico, XBrushes.Black,
+            new XRect(margen + 6, y + 6, anchoLeyendaFinal, altoLeyenda - 8), XStringFormats.TopCenter);
 
         y += altoLeyenda + 6;
 
@@ -331,6 +337,35 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         }
 
         gfx.DrawPath(XBrushes.Black, path);
+    }
+
+    /// Cuenta cuántas líneas ocupará el texto al hacer word-wrap dentro de anchoDisponible, simulando el
+    /// mismo wrap "greedy por palabra" que usa PdfSharp — un conteo por longitud de caracteres (como se
+    /// hacía antes) no reflejaba el ancho real de las palabras/fuente y dejaba la descripción desbordando
+    /// por debajo de la fila calculada.
+    private static int ContarLineas(XGraphics gfx, XFont fuente, string texto, double anchoDisponible)
+    {
+        if (string.IsNullOrEmpty(texto)) return 1;
+
+        var anchoEspacio = gfx.MeasureString(" ", fuente).Width;
+        var lineas = 1;
+        var anchoLinea = 0.0;
+
+        foreach (var palabra in texto.Split(' '))
+        {
+            var anchoPalabra = gfx.MeasureString(palabra, fuente).Width;
+            if (anchoLinea > 0 && anchoLinea + anchoEspacio + anchoPalabra > anchoDisponible)
+            {
+                lineas++;
+                anchoLinea = anchoPalabra;
+            }
+            else
+            {
+                anchoLinea = anchoLinea == 0 ? anchoPalabra : anchoLinea + anchoEspacio + anchoPalabra;
+            }
+        }
+
+        return lineas;
     }
 
     private static string RomperPalabrasLargas(string texto, int maxLargoPalabra)
