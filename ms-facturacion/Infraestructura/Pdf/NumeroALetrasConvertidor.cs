@@ -27,6 +27,8 @@ public static class NumeroALetrasConvertidor
         var nombreMoneda = monedaCodigo switch
         {
             "USD" => "DÓLARES AMERICANOS",
+            "EUR" => "EUROS",
+            "GBP" => "LIBRAS ESTERLINAS",
             _ => "SOLES"
         };
 

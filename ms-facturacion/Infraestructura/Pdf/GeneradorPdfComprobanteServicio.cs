@@ -248,24 +248,34 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var xLeyenda = margen + ladoQr + 10;
         var anchoLeyenda = anchoUtil - ladoQr - 10;
 
-        // PdfSharp solo hace word-wrap en espacios — un hash/código largo sin espacios se dibuja como una
-        // sola "palabra" y se sale del rectángulo. Se le insertan espacios cada 8 caracteres solo para que
-        // pueda cortarse en varias líneas; el valor real (sin espacios) es el que se usa en cualquier otro
-        // lado (QR, comparaciones, etc.), acá es puramente cosmético.
-        gfx.DrawString(
-            $"Representación impresa de la {nombreTipoDocumento}. Código de verificación: {InsertarEspacios(codigoVerificacion, 8)}",
-            fuenteTextoChico, XBrushes.Black, new XRect(xLeyenda, y, anchoLeyenda, 55), XStringFormats.TopLeft);
+        // Código de verificación y hash van en su propia línea (no pegados al texto) — a "Representación
+        // impresa de..." + código + hash todo corrido, el código quedaba cortado a mitad de línea antes de
+        // llegar a su propio texto. PdfSharp solo hace word-wrap en espacios — un hash/código largo sin
+        // espacios se dibuja como una sola "palabra" y se sale del rectángulo, por eso se le insertan
+        // espacios cada 8 caracteres solo para que pueda cortarse en varias líneas; el valor real (sin
+        // espacios) es el que se usa en cualquier otro lado (QR, comparaciones, etc.), acá es puramente
+        // cosmético.
+        gfx.DrawString($"Representación impresa de la {nombreTipoDocumento}.", fuenteTextoChico, XBrushes.Black,
+            new XRect(xLeyenda, y, anchoLeyenda, 12), XStringFormats.TopLeft);
+        gfx.DrawString("Código de verificación:", fuenteTextoChico, XBrushes.Black,
+            new XRect(xLeyenda, y + 11, anchoLeyenda, 12), XStringFormats.TopLeft);
+        gfx.DrawString(InsertarEspacios(codigoVerificacion, 8), fuenteTextoChico, XBrushes.Black,
+            new XRect(xLeyenda, y + 22, anchoLeyenda, 24), XStringFormats.TopLeft);
 
         if (!string.IsNullOrEmpty(sunatHash))
         {
-            gfx.DrawString($"Hash: {InsertarEspacios(sunatHash, 8)}", fuenteTextoChico, XBrushes.Black,
-                new XRect(xLeyenda, y + 40, anchoLeyenda, 30), XStringFormats.TopLeft);
+            gfx.DrawString("Hash:", fuenteTextoChico, XBrushes.Black,
+                new XRect(xLeyenda, y + 48, anchoLeyenda, 12), XStringFormats.TopLeft);
+            gfx.DrawString(InsertarEspacios(sunatHash, 8), fuenteTextoChico, XBrushes.Black,
+                new XRect(xLeyenda, y + 59, anchoLeyenda, 24), XStringFormats.TopLeft);
         }
 
         y += ladoQr + 12;
 
         // ===== Leyenda final =====
-        var altoLeyenda = 26.0;
+        // A 7.5pt la oración completa ocupa 2 líneas dentro del ancho útil — el recuadro necesita alto
+        // suficiente para ambas, si no el texto se sale por debajo del borde.
+        var altoLeyenda = 36.0;
         gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, altoLeyenda);
         gfx.DrawString(
             $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}, generada en el Sistema de SUNAT. " +
