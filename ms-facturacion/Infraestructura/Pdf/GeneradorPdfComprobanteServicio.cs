@@ -145,28 +145,37 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 
         foreach (var linea in documento.Lineas)
         {
-            // PdfSharp solo corta línea en espacios — si la descripción trae una "palabra" (o toda ella)
-            // sin ningún espacio, se dibuja de largo y se sale de la columna hacia Valor Unitario/ICBPER.
-            // RomperPalabrasLargas le mete espacios cada 30 caracteres dentro de cualquier palabra que los
-            // supere, solo para permitir el corte — no altera la descripción real guardada en BD.
-            var descripcionParaImprimir = RomperPalabrasLargas(linea.Descripcion, 30);
+            // XGraphics.DrawString(texto, fuente, brush, XRect, formato) NO hace word-wrap por sí solo —
+            // el XRect solo se usa para alinear una única línea, el texto completo se dibuja de largo sin
+            // cortarse aunque se salga del rectángulo. Por eso la descripción se parte a mano en líneas
+            // (EnvolverTexto, midiendo ancho real con MeasureString) y se dibuja una DrawString por línea.
             var anchoDescripcion = anchosColumna[2] - 6;
-            var lineasDescripcion = ContarLineas(gfx, fuenteTextoChico, descripcionParaImprimir, anchoDescripcion);
-            var altoFila = Math.Max(14, lineasDescripcion * 10 + 4);
+            var lineasDescripcion = EnvolverTexto(gfx, fuenteTextoChico, linea.Descripcion, anchoDescripcion);
+            var altoFila = Math.Max(14, lineasDescripcion.Count * 10 + 4);
             xCol = margen;
             var valores = new[]
             {
                 linea.Cantidad.ToString("0.###", CultureInfo.InvariantCulture),
                 linea.UnidadMedidaCodigo,
-                descripcionParaImprimir,
+                string.Empty,
                 linea.ValorUnitario.ToString("F2", CultureInfo.InvariantCulture),
                 "0.00"
             };
             for (var i = 0; i < valores.Length; i++)
             {
-                var alineacion = i == 2 ? XStringFormats.TopLeft : XStringFormats.TopCenter;
-                gfx.DrawString(valores[i], fuenteTextoChico, XBrushes.Black,
-                    new XRect(xCol + (i == 2 ? 3 : 0), y + 3, anchosColumna[i] - (i == 2 ? 6 : 0), altoFila), alineacion);
+                if (i == 2)
+                {
+                    for (var l = 0; l < lineasDescripcion.Count; l++)
+                    {
+                        gfx.DrawString(lineasDescripcion[l], fuenteTextoChico, XBrushes.Black,
+                            new XRect(xCol + 3, y + 3 + l * 10, anchoDescripcion, 10), XStringFormats.TopLeft);
+                    }
+                }
+                else
+                {
+                    gfx.DrawString(valores[i], fuenteTextoChico, XBrushes.Black,
+                        new XRect(xCol, y + 3, anchosColumna[i], altoFila), XStringFormats.TopCenter);
+                }
                 xCol += anchosColumna[i];
             }
             gfx.DrawLine(XPens.LightGray, margen, y + altoFila, margen + anchoUtil, y + altoFila);
@@ -250,43 +259,44 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var xLeyenda = margen + ladoQr + 10;
         var anchoLeyenda = anchoUtil - ladoQr - 10;
 
-        // Código de verificación y hash van en su propia línea (no pegados al texto) — a "Representación
-        // impresa de..." + código + hash todo corrido, el código quedaba cortado a mitad de línea antes de
-        // llegar a su propio texto. PdfSharp solo hace word-wrap en espacios — un hash/código largo sin
-        // espacios se dibuja como una sola "palabra" y se sale del rectángulo, por eso se le insertan
-        // espacios cada 8 caracteres solo para que pueda cortarse en varias líneas; el valor real (sin
-        // espacios) es el que se usa en cualquier otro lado (QR, comparaciones, etc.), acá es puramente
-        // cosmético.
-        gfx.DrawString($"Representación impresa de la {nombreTipoDocumento}.", fuenteTextoChico, XBrushes.Black,
-            new XRect(xLeyenda, y, anchoLeyenda, 12), XStringFormats.TopLeft);
-        gfx.DrawString("Código de verificación:", fuenteTextoChico, XBrushes.Black,
-            new XRect(xLeyenda, y + 11, anchoLeyenda, 12), XStringFormats.TopLeft);
-        gfx.DrawString(InsertarEspacios(codigoVerificacion, 8), fuenteTextoChico, XBrushes.Black,
-            new XRect(xLeyenda, y + 22, anchoLeyenda, 24), XStringFormats.TopLeft);
+        // XGraphics.DrawString con un XRect NO hace word-wrap por sí solo (solo alinea una única línea) —
+        // por eso cada párrafo se parte a mano con EnvolverTexto y se dibuja línea por línea con
+        // DibujarLineas. Al código/hash (que no traen espacios naturales) se les insertan espacios cada 8
+        // caracteres con InsertarEspacios solo para darle a EnvolverTexto puntos de corte — el valor real
+        // (sin espacios) es el que se usa en cualquier otro lado (QR, comparaciones, etc.), acá es
+        // puramente cosmético.
+        var yLeyenda = y;
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, $"Representación impresa de la {nombreTipoDocumento}.", anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, "Código de verificación:", anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, InsertarEspacios(codigoVerificacion, 8), anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
 
         if (!string.IsNullOrEmpty(sunatHash))
         {
-            gfx.DrawString("Hash:", fuenteTextoChico, XBrushes.Black,
-                new XRect(xLeyenda, y + 48, anchoLeyenda, 12), XStringFormats.TopLeft);
-            gfx.DrawString(InsertarEspacios(sunatHash, 8), fuenteTextoChico, XBrushes.Black,
-                new XRect(xLeyenda, y + 59, anchoLeyenda, 24), XStringFormats.TopLeft);
+            yLeyenda += 4;
+            yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, "Hash:", anchoLeyenda),
+                fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+            yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, InsertarEspacios(sunatHash, 8), anchoLeyenda),
+                fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
         }
 
-        y += ladoQr + 12;
+        y += Math.Max(ladoQr, yLeyenda - y) + 12;
 
         // ===== Leyenda final =====
-        // Alto calculado con ContarLineas en vez de un valor fijo: a un largo fijo, si nombreTipoDocumento
-        // cambia (o la traducción del texto crece), el texto puede necesitar más líneas de las previstas y
-        // se sale por debajo del recuadro.
+        // Alto calculado a partir de las líneas reales (EnvolverTexto) en vez de un valor fijo: a un largo
+        // fijo, si nombreTipoDocumento cambia (o la traducción del texto crece), el texto puede necesitar
+        // más líneas de las previstas y se sale por debajo del recuadro.
         var textoLeyendaFinal =
             $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}, generada en el Sistema de SUNAT. " +
             "Puede verificarla utilizando el código de verificación indicado arriba.";
         var anchoLeyendaFinal = anchoUtil - 12;
-        var lineasLeyendaFinal = ContarLineas(gfx, fuenteTextoChico, textoLeyendaFinal, anchoLeyendaFinal);
-        var altoLeyenda = lineasLeyendaFinal * 10 + 12;
+        var lineasLeyendaFinal = EnvolverTexto(gfx, fuenteTextoChico, textoLeyendaFinal, anchoLeyendaFinal);
+        var altoLeyenda = lineasLeyendaFinal.Count * 10 + 12;
         gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, altoLeyenda);
-        gfx.DrawString(textoLeyendaFinal, fuenteTextoChico, XBrushes.Black,
-            new XRect(margen + 6, y + 6, anchoLeyendaFinal, altoLeyenda - 8), XStringFormats.TopCenter);
+        DibujarLineas(gfx, lineasLeyendaFinal, fuenteTextoChico, margen + 6, anchoLeyendaFinal, y + 6, 10,
+            XStringFormats.TopCenter);
 
         y += altoLeyenda + 6;
 
@@ -339,40 +349,76 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         gfx.DrawPath(XBrushes.Black, path);
     }
 
-    /// Cuenta cuántas líneas ocupará el texto al hacer word-wrap dentro de anchoDisponible, simulando el
-    /// mismo wrap "greedy por palabra" que usa PdfSharp — un conteo por longitud de caracteres (como se
-    /// hacía antes) no reflejaba el ancho real de las palabras/fuente y dejaba la descripción desbordando
-    /// por debajo de la fila calculada.
-    private static int ContarLineas(XGraphics gfx, XFont fuente, string texto, double anchoDisponible)
+    /// XGraphics.DrawString(texto, fuente, brush, XRect, formato) NO hace word-wrap por sí solo — el XRect
+    /// solo alinea una única línea, el texto se dibuja de largo aunque se salga del rectángulo. Esto arma
+    /// a mano la lista de líneas (wrap "greedy por palabra", igual que un procesador de texto), midiendo
+    /// ancho real con MeasureString en vez de asumir un promedio de caracteres por línea.
+    private static List<string> EnvolverTexto(XGraphics gfx, XFont fuente, string texto, double anchoDisponible)
     {
-        if (string.IsNullOrEmpty(texto)) return 1;
+        if (string.IsNullOrEmpty(texto)) return [string.Empty];
 
         var anchoEspacio = gfx.MeasureString(" ", fuente).Width;
-        var lineas = 1;
-        var anchoLinea = 0.0;
+        var lineas = new List<string>();
+        var lineaActual = string.Empty;
+        var anchoLineaActual = 0.0;
 
         foreach (var palabra in texto.Split(' '))
         {
             var anchoPalabra = gfx.MeasureString(palabra, fuente).Width;
-            if (anchoLinea > 0 && anchoLinea + anchoEspacio + anchoPalabra > anchoDisponible)
+
+            // Una palabra más ancha que la columna entera nunca va a entrar en una línea aunque esté sola
+            // — se corta carácter por carácter como último recurso, para no salirse del rectángulo.
+            if (anchoPalabra > anchoDisponible)
             {
-                lineas++;
-                anchoLinea = anchoPalabra;
+                if (lineaActual.Length > 0)
+                {
+                    lineas.Add(lineaActual);
+                    lineaActual = string.Empty;
+                    anchoLineaActual = 0;
+                }
+
+                var trozo = string.Empty;
+                foreach (var caracter in palabra)
+                {
+                    if (trozo.Length > 0 && gfx.MeasureString(trozo + caracter, fuente).Width > anchoDisponible)
+                    {
+                        lineas.Add(trozo);
+                        trozo = string.Empty;
+                    }
+                    trozo += caracter;
+                }
+                lineaActual = trozo;
+                anchoLineaActual = gfx.MeasureString(trozo, fuente).Width;
+                continue;
+            }
+
+            if (lineaActual.Length > 0 && anchoLineaActual + anchoEspacio + anchoPalabra > anchoDisponible)
+            {
+                lineas.Add(lineaActual);
+                lineaActual = palabra;
+                anchoLineaActual = anchoPalabra;
             }
             else
             {
-                anchoLinea = anchoLinea == 0 ? anchoPalabra : anchoLinea + anchoEspacio + anchoPalabra;
+                anchoLineaActual = lineaActual.Length == 0 ? anchoPalabra : anchoLineaActual + anchoEspacio + anchoPalabra;
+                lineaActual = lineaActual.Length == 0 ? palabra : $"{lineaActual} {palabra}";
             }
         }
 
-        return lineas;
+        if (lineaActual.Length > 0) lineas.Add(lineaActual);
+        return lineas.Count > 0 ? lineas : [string.Empty];
     }
 
-    private static string RomperPalabrasLargas(string texto, int maxLargoPalabra)
+    private static double DibujarLineas(
+        XGraphics gfx, IReadOnlyList<string> lineas, XFont fuente, double x, double ancho, double y, double alturaLinea,
+        XStringFormat? formato = null)
     {
-        var palabras = texto.Split(' ');
-        var partes = palabras.Select(p => p.Length > maxLargoPalabra ? InsertarEspacios(p, maxLargoPalabra) : p);
-        return string.Join(' ', partes);
+        foreach (var linea in lineas)
+        {
+            gfx.DrawString(linea, fuente, XBrushes.Black, new XRect(x, y, ancho, alturaLinea), formato ?? XStringFormats.TopLeft);
+            y += alturaLinea;
+        }
+        return y;
     }
 
     private static string InsertarEspacios(string valor, int cada)
