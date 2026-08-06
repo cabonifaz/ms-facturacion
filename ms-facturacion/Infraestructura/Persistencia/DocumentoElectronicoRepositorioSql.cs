@@ -245,6 +245,133 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<DocumentoElectronicoDetallePublico>(idTipoMensaje, mensaje, default);
+            }
+
+            // Result set 2: cabecera
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var cabecera = new DocumentoElectronicoPublico(
+                LeerNullableString(lector, "NumeroReferencia"),
+                lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                lector.GetString(lector.GetOrdinal("Serie")),
+                lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
+                lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
+                lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
+                lector.GetString(lector.GetOrdinal("EmpresaRuc")),
+                lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
+                LeerNullableString(lector, "EmpresaNombreComercial"),
+                lector.GetString(lector.GetOrdinal("EmpresaDireccion")),
+                lector.GetString(lector.GetOrdinal("EmpresaUbigeo")),
+                lector.GetString(lector.GetOrdinal("ClienteTipoDocumentoCodigo")),
+                lector.GetString(lector.GetOrdinal("ClienteNumeroDocumento")),
+                lector.GetString(lector.GetOrdinal("ClienteNombre")),
+                LeerNullableString(lector, "ClienteDireccion"),
+                LeerNullableString(lector, "ClienteCorreo"),
+                lector.GetString(lector.GetOrdinal("ClientePaisCodigo")),
+                lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
+                lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
+                lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
+                lector.GetDecimal(lector.GetOrdinal("TotalGratuito")),
+                lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
+                lector.GetDecimal(lector.GetOrdinal("TotalIsc")),
+                lector.GetDecimal(lector.GetOrdinal("TotalOtrosTributos")),
+                lector.GetDecimal(lector.GetOrdinal("TotalDescuento")),
+                lector.GetDecimal(lector.GetOrdinal("TotalCargo")),
+                lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                LeerNullableString(lector, "SunatHash"),
+                LeerNullableString(lector, "SunatCodigoRespuesta"),
+                LeerNullableString(lector, "SunatDescripcionRespuesta"),
+                LeerNullableDateTime(lector, "FechaAceptacion"),
+                LeerNullableDateTime(lector, "FechaRechazo"),
+                LeerNullableDateTime(lector, "FechaAnulacion"),
+                lector.GetDateTime(lector.GetOrdinal("FchCre")));
+
+            // Result set 3: líneas
+            await lector.NextResultAsync(cancellationToken);
+            var lineas = new List<LineaDocumentoElectronicoPublica>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                lineas.Add(new LineaDocumentoElectronicoPublica(
+                    lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableString(lector, "ProductoSunatCodigo"),
+                    lector.GetString(lector.GetOrdinal("Descripcion")),
+                    lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
+                    lector.GetDecimal(lector.GetOrdinal("Cantidad")),
+                    lector.GetDecimal(lector.GetOrdinal("ValorUnitario")),
+                    lector.GetDecimal(lector.GetOrdinal("PrecioUnitario")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoDescuento")),
+                    lector.GetString(lector.GetOrdinal("AfectacionIgvCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoSunatCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoNombre")),
+                    lector.GetString(lector.GetOrdinal("TributoTaxTypeCode")),
+                    lector.GetString(lector.GetOrdinal("TributoCategoria")),
+                    lector.GetDecimal(lector.GetOrdinal("PorcentajeIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoIsc")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoOtrosTributos")),
+                    lector.GetDecimal(lector.GetOrdinal("ValorLinea")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalLinea"))));
+            }
+
+            // Result set 4: referencia (0 o 1 fila — solo notas de crédito/débito)
+            await lector.NextResultAsync(cancellationToken);
+            ReferenciaDocumentoElectronicaPublica? referencia = null;
+            if (await lector.ReadAsync(cancellationToken))
+            {
+                referencia = new ReferenciaDocumentoElectronicaPublica(
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
+                    lector.GetString(lector.GetOrdinal("SerieRelacionada")),
+                    lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
+                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
+                    lector.GetString(lector.GetOrdinal("MotivoCodigo")),
+                    lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
+            }
+
+            // Result set 5: cuotas (0 filas si fue Contado)
+            await lector.NextResultAsync(cancellationToken);
+            var cuotas = new List<CuotaDocumentoElectronicaPublica>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                cuotas.Add(new CuotaDocumentoElectronicaPublica(
+                    lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
+                    lector.GetDecimal(lector.GetOrdinal("Monto")),
+                    lector.GetString(lector.GetOrdinal("EstadoCuotaCodigo")),
+                    LeerNullableDateTime(lector, "FechaPago")));
+            }
+
+            var detalle = new DocumentoElectronicoDetallePublico(cabecera, lineas, referencia, cuotas);
+            return ResultadoOperacion<DocumentoElectronicoDetallePublico>.DeExito(mensaje, detalle);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<DocumentoElectronicoDetallePublico>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken)

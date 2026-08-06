@@ -12,4 +12,10 @@ public interface IArchivoDocumentoRepositorio
     /// (TRANSMISIONES_SUNAT.IdArchivoXml/IdArchivoPdf), ver SP_ArchivoDocumento_ObtenerXmlYPdf.
     Task<ResultadoOperacion<ArchivoDescarga>> ObtenerXmlOPdfAsync(
         int idInquilino, int idDocumentoElectronico, string tipoArchivoCodigo, CancellationToken cancellationToken);
+
+    /// Camino de verificación pública: mismo resultado que ObtenerXmlOPdfAsync, pero resuelto por
+    /// TokenPublico en vez de idInquilino/idDocumentoElectronico ya conocidos — ver
+    /// SP_ArchivoDocumento_ObtenerXmlYPdfPorToken.
+    Task<ResultadoOperacion<ArchivoDescarga>> ObtenerXmlOPdfPorTokenAsync(
+        string tokenPublico, string tipoArchivoCodigo, CancellationToken cancellationToken);
 }

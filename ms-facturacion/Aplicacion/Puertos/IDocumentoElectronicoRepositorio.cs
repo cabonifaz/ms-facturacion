@@ -20,6 +20,13 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<string>> ObtenerTokenPublicoAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
+    /// Camino inverso a ObtenerTokenPublicoAsync: dado el token público (el "código de verificación" del
+    /// PDF), devuelve el documento — puerta de entrada de la verificación pública (link con solo el token,
+    /// sin idInquilino, sin autenticación). Proyección pública sin ningún Id* interno, ver
+    /// SP_DocumentoElectronico_ObtenerPorToken y DocumentoElectronicoDetallePublico.
+    Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);

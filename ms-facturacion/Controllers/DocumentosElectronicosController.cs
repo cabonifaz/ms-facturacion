@@ -55,6 +55,9 @@ public sealed class DocumentosElectronicosController(
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
     ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
+    ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
+    ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
+    ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -146,6 +149,35 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
     {
         var resultado = await obtenerUrlDescargaCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, tipoArchivo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Puerta de entrada de la verificación pública: dado solo el token (el "código de verificación" del
+    // PDF), sin idInquilino, sin autenticación de usuario. maximlian3_backend es quien la expone sin
+    // requerir login — acá sigue detrás del X-Api-Key normal (único llamador válido es maximlian3_backend).
+    [HttpGet("token/{token}")]
+    public async Task<IActionResult> ObtenerPorToken(string token, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // tipoArchivo: "Xml" o "Pdf". Mismo criterio que ObtenerPorToken.
+    [HttpGet("token/{token}/url-descarga")]
+    public async Task<IActionResult> ObtenerUrlDescargaPorToken(
+        string token, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerUrlDescargaPorTokenCasoDeUso.EjecutarAsync(token, tipoArchivo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Para que maximlian3_backend arme el link de verificación pública ({frontendBaseUrl}/{token}) —
+    // el token nunca se expone vía Obtener (ver SP_DocumentoElectronico_Obtener), solo acá.
+    [HttpGet("{idDocumentoElectronico:int}/token-verificacion")]
+    public async Task<IActionResult> ObtenerTokenVerificacion(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerTokenVerificacionCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

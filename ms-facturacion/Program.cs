@@ -93,9 +93,12 @@ builder.Services.AddScoped<EliminarSerieDocumentoCasoDeUso>();
 // Casos de Uso — DocumentoElectronico
 builder.Services.AddScoped<InsertarDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<ObtenerDocumentoElectronicoPorTokenCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso>();
 builder.Services.AddScoped<ObtenerUrlDescargaDocumentoCasoDeUso>();
+builder.Services.AddScoped<ObtenerUrlDescargaPorTokenCasoDeUso>();
+builder.Services.AddScoped<ObtenerTokenVerificacionDocumentoCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();
