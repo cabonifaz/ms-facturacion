@@ -111,36 +111,73 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         // Las 3 partes (etiqueta/":"/valor) de una misma fila van todas por XRect+TopLeft — mezclar eso con
         // DrawString(..., XPoint) (que ancla por baseline, no por el techo del texto) hacía que el valor
         // apareciera ~9pt más abajo que su propia etiqueta, calzando visualmente con la fila siguiente.
-        const double anchoEtiqueta = 130;
+        //
+        // Todo el bloque (etiqueta+":"+valor) ocupa solo la mitad izquierda de la página, no todo anchoUtil
+        // — si un valor no entra ahí, se envuelve: la línea siguiente de etiqueta arranca en margen (mismo
+        // x que la primera), la línea siguiente de valor arranca después del ":" (margen+anchoEtiqueta+8),
+        // nunca en margen.
+        const double anchoEtiqueta = 115;
+        var anchoBloqueCampos = anchoUtil / 2;
+        var anchoValorCampo = anchoBloqueCampos - anchoEtiqueta - 8;
+
         double DibujarCampo(string etiqueta, string valor)
         {
-            var anchoValor = anchoUtil - anchoEtiqueta - 8;
-            gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
-            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
-            var lineasValor = EnvolverTexto(gfx, fuenteTextoNegrita, valor, anchoValor);
-            return DibujarLineas(gfx, lineasValor, fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, y, 12);
+            var lineasEtiqueta = EnvolverTexto(gfx, fuenteTexto, etiqueta, anchoEtiqueta - 4);
+            var yEtiqueta = DibujarLineas(gfx, lineasEtiqueta, fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
+
+            var anchoEtiquetaReal = gfx.MeasureString(lineasEtiqueta[0], fuenteTexto).Width;
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiquetaReal + 4, y, 8, 12), XStringFormats.TopLeft);
+
+            var lineasValor = EnvolverTexto(gfx, fuenteTextoNegrita, valor, anchoValorCampo);
+            var yValor = DibujarLineas(gfx, lineasValor, fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, y, 12);
+
+            return Math.Max(yEtiqueta, yValor);
         }
 
         // Dirección y distrito-provincia-departamento van en líneas separadas (no concatenadas en un solo
         // valor) para que calcen con la representación impresa de referencia de SUNAT.
         double DibujarCampoDosLineas(string etiqueta, string valorLinea1, string valorLinea2)
         {
-            var anchoValor = anchoUtil - anchoEtiqueta - 8;
-            gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
-            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
+            var lineasEtiqueta = EnvolverTexto(gfx, fuenteTexto, etiqueta, anchoEtiqueta - 4);
+            var yEtiqueta = DibujarLineas(gfx, lineasEtiqueta, fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
+
+            var anchoEtiquetaReal = gfx.MeasureString(lineasEtiqueta[0], fuenteTexto).Width;
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiquetaReal + 4, y, 8, 12), XStringFormats.TopLeft);
+
             var yValor = y;
-            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea1, anchoValor),
-                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, yValor, 11);
-            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea2, anchoValor),
-                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, yValor, 11);
-            return yValor;
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea1, anchoValorCampo),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, yValor, 11);
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea2, anchoValorCampo),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, yValor, 11);
+
+            return Math.Max(yEtiqueta, yValor);
         }
+
+        var yInicioCampos = y;
 
         y = DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
         y = DibujarCampo("Señor(es)", cabecera.ClienteNombre);
         y = DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa) + 12;
         y = DibujarCampo("Tipo de Moneda", nombreMoneda);
         y = DibujarCampo("Observación", cabecera.NumeroReferencia ?? "") + 6;
+
+        // ===== Campos extra (texto libre cargado por el usuario, sin relación con SUNAT) — mitad derecha
+        // de la página, un renglón por campo, protegido contra overflow igual que todo lo demás. =====
+        if (documento.CamposExtra.Count > 0)
+        {
+            const double margenIzquierdoCamposExtra = 30;
+            var xCamposExtra = margen + anchoBloqueCampos + margenIzquierdoCamposExtra;
+            var anchoCamposExtra = anchoUtil - anchoBloqueCampos - margenIzquierdoCamposExtra;
+            var yCamposExtra = yInicioCampos;
+
+            foreach (var campoExtra in documento.CamposExtra)
+            {
+                yCamposExtra = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, campoExtra.Texto, anchoCamposExtra),
+                    fuenteTextoNegrita, xCamposExtra, anchoCamposExtra, yCamposExtra, 12);
+            }
+
+            y = Math.Max(y, yCamposExtra);
+        }
 
         // ===== Tabla de líneas =====
         double[] anchosColumna = [45, 75, anchoUtil - 45 - 75 - 70 - 60, 70, 60];
@@ -257,17 +294,6 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         }
 
         y = Math.Max(yFinSon + 10, yTotales + 15);
-
-        // ===== Campos extra (texto libre cargado por el usuario, sin relación con SUNAT) =====
-        if (documento.CamposExtra.Count > 0)
-        {
-            foreach (var campoExtra in documento.CamposExtra)
-            {
-                y = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, campoExtra.Texto, anchoUtil),
-                    fuenteTexto, margen, anchoUtil, y, 12);
-            }
-            y += 6;
-        }
 
         // ===== QR (Anexo C, RS 113-2018/SUNAT) =====
         // RUC|TipoDoc|Serie|Correlativo|IGV|Total|FechaEmision|TipoDocAdq|NumDocAdq|Hash
