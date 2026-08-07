@@ -16,6 +16,11 @@ public sealed class DocumentoElectronico
     public required DateOnly FechaEmision { get; init; }
     public required TimeOnly HoraEmision { get; init; }
     public required string MonedaCodigo { get; init; }
+
+    /// cac:PaymentExchangeRate/cbc:CalculationRate en el XML UBL — solo aplica cuando MonedaCodigo no es
+    /// PEN y el documento está ligado a una detracción/percepción/retención (Anexo N.° 7 SUNAT).
+    public decimal? TipoCambio { get; init; }
+
     public required string TipoOperacionCodigo { get; init; }
 
     /// No es una columna persistida — SP_DocumentoElectronico_Obtener la resuelve contra
@@ -38,7 +43,9 @@ public sealed class DocumentoElectronico
     public required decimal TotalGravado { get; init; }
     public required decimal TotalInafecto { get; init; }
     public required decimal TotalExonerado { get; init; }
-    public required decimal TotalGratuito { get; init; }
+    /// Solo agrupa código SUNAT 40 (Exportación de Bienes o Servicios) — pese al nombre, nunca fue un
+    /// bucket de "operaciones gratuitas" literal (esas se folded en Gravado/Exonerado/Inafecto).
+    public required decimal TotalExportacion { get; init; }
     public required decimal TotalIgv { get; init; }
     public required decimal TotalIsc { get; init; }
     public required decimal TotalOtrosTributos { get; init; }

@@ -5,4 +5,5 @@ namespace ms_facturacion.Dominio;
 /// ms-facturación, distinto shape/filtros). Ver SP_DocumentoElectronico_ListarParaPedidoFactura.
 public sealed record FacturaResumenPedidoFactura(
     int IdDocumentoElectronico, string NumeroFactura, string ClienteNombre, DateOnly FechaEmision,
-    string FormaPagoCodigo, decimal TotalImporte, string EstadoCodigo, string ColorLetra, string ColorFondo);
+    string FormaPagoCodigo, decimal TotalImporte, string MonedaIcono, string EstadoCodigo, string ColorLetra,
+    string ColorFondo);

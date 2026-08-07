@@ -132,9 +132,17 @@ public sealed class SunatBillServiceCliente(
         var codigoRespuesta = respuestaNodo?.Element(Cbc + "ResponseCode")?.Value ?? string.Empty;
         var descripcionRespuesta = respuestaNodo?.Element(Cbc + "Description")?.Value ?? string.Empty;
 
+        // Un "AceptadoConObservaciones" puede traer varios cbc:Note (uno por observación), en cualquier
+        // parte del CDR (no solo bajo cac:Response) — antes solo se leía la Description principal y el
+        // resto se perdía sin persistirse en ningún lado más que el CDR crudo.
+        var observaciones = cdrDocumento.Descendants(Cbc + "Note")
+            .Select(n => n.Value.Trim())
+            .Where(v => v.Length > 0)
+            .ToList();
+
         var estadoCodigo = MapearEstadoCodigo(codigoRespuesta);
 
-        var resultado = new ResultadoEnvioSunat(estadoCodigo, codigoRespuesta, descripcionRespuesta, cdrZipBytes, cdrXmlBytes);
+        var resultado = new ResultadoEnvioSunat(estadoCodigo, codigoRespuesta, descripcionRespuesta, observaciones, cdrZipBytes, cdrXmlBytes);
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("SUNAT procesó el envío.", resultado);
     }
 

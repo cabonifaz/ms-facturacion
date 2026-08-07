@@ -18,9 +18,9 @@ public sealed record ItemPeticion(
 
 public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
-    int IdMonedaMaestro, int IdTipoOperacionMaestro,
+    int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
-    IReadOnlyList<ItemPeticion> Items);
+    IReadOnlyList<ItemPeticion> Items, IReadOnlyList<CampoExtraPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoSunatPeticion(
     EstadoMaestroCodigo EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
@@ -36,9 +36,14 @@ public sealed record LineaEdicionPeticion(
 public sealed record CuotaEdicionPeticion(
     DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
 
+/// Campo extra dentro de "Guardar cambios" en lote — mismo criterio de IdCampoExtraDocumentoElectronico
+/// que LineaEdicionPeticion/CuotaEdicionPeticion.
+public sealed record CampoExtraEdicionPeticion(string Texto, int IdCampoExtraDocumentoElectronico = 0);
+
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, int IdTipoOperacionMaestro,
-    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
+    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
+    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
+    IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
@@ -49,11 +54,18 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoCasoDeUso obtenerCasoDeUso,
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
     ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso listarParaPedidoFacturaCasoDeUso,
+    ListarDocumentosParaSireRvieCasoDeUso listarParaSireRvieCasoDeUso,
+    GenerarTxtSireRvieCasoDeUso generarTxtSireRvieCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
     ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
+    ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
+    ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
+    ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
+    ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
+    ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -82,11 +94,15 @@ public sealed class DocumentosElectronicosController(
             .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
             .ToList();
 
+        var camposExtra = (peticion.CamposExtra ?? [])
+            .Select(c => new CampoExtraEntrada(c.Texto))
+            .ToList();
+
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno, peticion.NumeroReferencia,
             peticion.IdTipoDocumentoMaestro,
-            peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
-            documentoAfectado, lineas, cuotas, cancellationToken);
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
+            documentoAfectado, lineas, cuotas, camposExtra, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
@@ -112,9 +128,13 @@ public sealed class DocumentosElectronicosController(
                 cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdCuotaDocumentoElectronico))
             .ToList();
 
+        var camposExtra = (peticion.CamposExtra ?? [])
+            .Select(c => new CampoExtraEntrada(c.Texto, c.IdCampoExtraDocumentoElectronico))
+            .ToList();
+
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
-            peticion.IdMonedaMaestro, peticion.IdTipoOperacionMaestro, lineas, cuotas, cancellationToken);
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, lineas, cuotas, camposExtra, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
@@ -136,6 +156,44 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
         var resultado = await obtenerCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // tipoArchivo: "Xml" o "Pdf". Devuelve una URL presignada de S3 (vigencia 5 min), no el archivo en sí.
+    [HttpGet("{idDocumentoElectronico:int}/url-descarga")]
+    public async Task<IActionResult> ObtenerUrlDescarga(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerUrlDescargaCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, tipoArchivo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Puerta de entrada de la verificación pública: dado solo el token (el "código de verificación" del
+    // PDF), sin idInquilino, sin autenticación de usuario. maximlian3_backend es quien la expone sin
+    // requerir login — acá sigue detrás del X-Api-Key normal (único llamador válido es maximlian3_backend).
+    [HttpGet("token/{token}")]
+    public async Task<IActionResult> ObtenerPorToken(string token, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // tipoArchivo: "Xml" o "Pdf". Mismo criterio que ObtenerPorToken.
+    [HttpGet("token/{token}/url-descarga")]
+    public async Task<IActionResult> ObtenerUrlDescargaPorToken(
+        string token, [FromQuery] string tipoArchivo, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerUrlDescargaPorTokenCasoDeUso.EjecutarAsync(token, tipoArchivo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Para que maximlian3_backend arme el link de verificación pública ({frontendBaseUrl}/{token}) —
+    // el token nunca se expone vía Obtener (ver SP_DocumentoElectronico_Obtener), solo acá.
+    [HttpGet("{idDocumentoElectronico:int}/token-verificacion")]
+    public async Task<IActionResult> ObtenerTokenVerificacion(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerTokenVerificacionCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
@@ -164,6 +222,33 @@ public sealed class DocumentosElectronicosController(
             idInquilino, idEmpresa, estadoCodigo, idFormaPago, fechaDesde, fechaHasta, busqueda, pagina, tamanoPagina, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
+    }
+
+    // SIRE RVIE (Formato 14.4) — documentos de un período ya con todos los campos resueltos para el
+    // generador del TXT (ver SP_DocumentoElectronico_ListarParaSireRvie y SIRE_RVIE_Estructura_Campos.md).
+    [HttpGet("sire-rvie")]
+    public async Task<IActionResult> ListarParaSireRvie(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly periodo,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await listarParaSireRvieCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, periodo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Devuelve el TXT ya armado (no el JSON de arriba) — descarga directa, listo para comprimir en ZIP y
+    // subir al módulo SIRE. Codificado en ISO-8859-1 (ver GeneradorSireRvieServicio).
+    [HttpGet("sire-rvie/txt")]
+    public async Task<IActionResult> GenerarTxtSireRvie(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly periodo,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await generarTxtSireRvieCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, periodo, cancellationToken);
+        if (resultado.IdTipoMensaje != TipoMensaje.Exito || resultado.Datos is null)
+        {
+            return ResponderSegunEnvelope(resultado);
+        }
+
+        return File(resultado.Datos.Contenido, "text/plain", resultado.Datos.NombreArchivo);
     }
 
     // Uso exclusivo del Worker (Módulo 4) — no es un Actualizar genérico, solo aplica la respuesta de SUNAT.
@@ -196,6 +281,16 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, [FromQuery] int ultimoIdEvento, CancellationToken cancellationToken)
     {
         var resultado = await listarEventosRecientesCasoDeUso.EjecutarAsync(idInquilino, ultimoIdEvento, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Solo los errores/observaciones del último intento de envío a SUNAT (no el historial completo de
+    // reintentos anteriores) — ver SP_ErrorDocumento_ListarUltimoEnvio.
+    [HttpGet("{idDocumentoElectronico:int}/errores-ultimo-envio")]
+    public async Task<IActionResult> ListarErroresUltimoEnvio(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await listarErroresUltimoEnvioCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
