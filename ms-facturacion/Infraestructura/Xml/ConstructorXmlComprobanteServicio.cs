@@ -100,7 +100,21 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
-            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
+            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+
+        // cac:PaymentExchangeRate — solo cuando el documento trae TipoCambio (moneda extranjera ligada a
+        // detracción/percepción/retención, Anexo N.° 7 SUNAT). Target siempre PEN: es el único caso en que
+        // este tipo de cambio aplica.
+        if (cabecera.TipoCambio.HasValue)
+        {
+            raiz.Add(new XElement(Cac + "PaymentExchangeRate",
+                new XElement(Cbc + "SourceCurrencyCode", moneda),
+                new XElement(Cbc + "TargetCurrencyCode", "PEN"),
+                new XElement(Cbc + "CalculationRate", cabecera.TipoCambio.Value.ToString("0.000", CultureInfo.InvariantCulture)),
+                new XElement(Cbc + "Date", cabecera.FechaEmision.ToString("yyyy-MM-dd"))));
+        }
+
+        raiz.Add(
             ConstruirTaxTotal(documento.Lineas, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
@@ -207,7 +221,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     }
 
     /// SUNAT exige un cac:TaxSubtotal por cada tributo que aparezca en al menos una línea (fault 2638) —
-    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Gratuito) agrupan por
+    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Exportacion) agrupan por
     /// Num2/AfectacionIgvCodigo, NO por tributo real: un mismo bucket Gravado puede mezclar líneas con
     /// tributo 1000 y 9996 a la vez (ver fix de fault 2040), así que no sirven para armar este total —
     /// hay que agrupar las líneas por su propio TributoSunatCodigo.
@@ -245,7 +259,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     /// (DebitNote) — mismos hijos en los tres casos.
     private XElement ConstruirTotalMonetario(string elementoTotalMonetario, DocumentoElectronico cabecera, string moneda)
     {
-        var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalGratuito;
+        var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalExportacion;
 
         return new XElement(Cac + elementoTotalMonetario,
             new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), lineExtensionAmount.ToString("F2", CultureInfo.InvariantCulture)),

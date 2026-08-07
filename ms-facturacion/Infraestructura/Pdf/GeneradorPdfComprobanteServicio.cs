@@ -15,10 +15,30 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 {
     private static readonly Dictionary<string, string> NombresTipoDocumento = new()
     {
-        ["01"] = "FACTURA ELECTRÓNICA",
-        ["03"] = "BOLETA DE VENTA ELECTRÓNICA",
-        ["07"] = "NOTA DE CRÉDITO ELECTRÓNICA",
-        ["08"] = "NOTA DE DÉBITO ELECTRÓNICA"
+        ["01"] = "FACTURA ELECTRONICA",
+        ["03"] = "BOLETA DE VENTA ELECTRONICA",
+        ["07"] = "NOTA DE CREDITO ELECTRONICA",
+        ["08"] = "NOTA DE DEBITO ELECTRONICA"
+    };
+
+    // Nombre legible de moneda — mismo subconjunto sembrado en ms-facturación TABLA_MAESTRA IdMaestro=11
+    // (PEN/USD/EUR/GBP). Este generador no tiene acceso a BD, por eso va como diccionario fijo acá.
+    private static readonly Dictionary<string, string> NombresMoneda = new()
+    {
+        ["PEN"] = "SOL",
+        ["USD"] = "DOLAR AMERICANO",
+        ["EUR"] = "EURO",
+        ["GBP"] = "LIBRA ESTERLINA"
+    };
+
+    // Mismos símbolos sembrados en ms-facturación TABLA_MAESTRA IdMaestro=11.String3 (ver
+    // 03_LlenarTablaMaestra_MsFacturacion.sql) — este generador no tiene acceso a BD, van fijos acá.
+    private static readonly Dictionary<string, string> SimbolosMoneda = new()
+    {
+        ["PEN"] = "S/",
+        ["USD"] = "US$",
+        ["EUR"] = "€",
+        ["GBP"] = "£"
     };
 
     private static bool _fontResolverConfigurado;
@@ -43,54 +63,127 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         pagina.Height = XUnit.FromMillimeter(297);
         using var gfx = XGraphics.FromPdfPage(pagina);
 
-        var fuenteTitulo = new XFont(FuenteEmbebidaResolver.NombreFamilia, 14, XFontStyleEx.Bold);
-        var fuenteSubtitulo = new XFont(FuenteEmbebidaResolver.NombreFamilia, 10, XFontStyleEx.Bold);
-        var fuenteTexto = new XFont(FuenteEmbebidaResolver.NombreFamilia, 9, XFontStyleEx.Regular);
+        var fuenteTitulo = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 13, XFontStyleEx.Regular);
+        var fuenteSubtitulo = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 10, XFontStyleEx.Regular);
+        var fuenteTexto = new XFont(FuenteEmbebidaResolver.NombreFamilia, 8.5, XFontStyleEx.Regular);
+        var fuenteTextoNegrita = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 8.5, XFontStyleEx.Regular);
         var fuenteTextoChico = new XFont(FuenteEmbebidaResolver.NombreFamilia, 7.5, XFontStyleEx.Regular);
-        var fuenteEncabezadoTabla = new XFont(FuenteEmbebidaResolver.NombreFamilia, 8, XFontStyleEx.Bold);
+        var fuenteEncabezadoTabla = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 8, XFontStyleEx.Regular);
 
-        var margen = XUnit.FromMillimeter(15).Point;
+        var margen = XUnit.FromMillimeter(12).Point;
         var anchoUtil = pagina.Width.Point - 2 * margen;
-        double y = margen;
+        var yInicio = margen;
+        double y = yInicio + 8;
 
-        var nombreTipoDocumento = NombresTipoDocumento.GetValueOrDefault(cabecera.TipoDocumentoCodigo, "COMPROBANTE ELECTRÓNICO");
+        var nombreTipoDocumento = NombresTipoDocumento.GetValueOrDefault(cabecera.TipoDocumentoCodigo, "COMPROBANTE ELECTRONICO");
+        var nombreMoneda = NombresMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
+        var simboloMoneda = SimbolosMoneda.GetValueOrDefault(cabecera.MonedaCodigo, cabecera.MonedaCodigo);
+        var ciudadEmpresa = $"{empresa.Distrito}-{empresa.Provincia}-{empresa.Departamento}";
 
-        // Cabecera: datos del emisor (izquierda) + recuadro RUC/tipo/serie-correlativo (derecha)
-        gfx.DrawString(empresa.NombreComercial ?? empresa.RazonSocial, fuenteTitulo, XBrushes.Black, new XPoint(margen, y + 12));
-        gfx.DrawString(empresa.RazonSocial, fuenteTexto, XBrushes.Black, new XPoint(margen, y + 26));
-        gfx.DrawString($"RUC {empresa.Ruc}", fuenteTexto, XBrushes.Black, new XPoint(margen, y + 38));
-        gfx.DrawString(empresa.Direccion, fuenteTexto, XBrushes.Black, new XPoint(margen, y + 50));
-        gfx.DrawString($"{empresa.Distrito}, {empresa.Provincia}, {empresa.Departamento}", fuenteTexto, XBrushes.Black, new XPoint(margen, y + 62));
-
-        var anchoRecuadro = XUnit.FromMillimeter(70).Point;
+        // ===== Cabecera: emisor (izquierda) + recuadro tipo/RUC/serie-correlativo (derecha) =====
+        var anchoRecuadro = XUnit.FromMillimeter(65).Point;
         var xRecuadro = margen + anchoUtil - anchoRecuadro;
-        var altoRecuadro = XUnit.FromMillimeter(28).Point;
+
+        var anchoCabeceraIzquierda = anchoUtil - anchoRecuadro - 10;
+        var yCabeceraIzquierda = y + 6;
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTitulo, empresa.RazonSocial, anchoCabeceraIzquierda),
+            fuenteTitulo, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 14);
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, empresa.Direccion, anchoCabeceraIzquierda),
+            fuenteTexto, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 9);
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, ciudadEmpresa, anchoCabeceraIzquierda),
+            fuenteTexto, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 9);
+
+        var altoRecuadro = XUnit.FromMillimeter(22).Point;
         gfx.DrawRectangle(XPens.Black, xRecuadro, y, anchoRecuadro, altoRecuadro);
-        gfx.DrawString($"RUC: {empresa.Ruc}", fuenteSubtitulo, XBrushes.Black,
-            new XRect(xRecuadro, y + 6, anchoRecuadro, 16), XStringFormats.TopCenter);
         gfx.DrawString(nombreTipoDocumento, fuenteSubtitulo, XBrushes.Black,
-            new XRect(xRecuadro, y + 22, anchoRecuadro, 16), XStringFormats.TopCenter);
-        gfx.DrawString($"{cabecera.Serie}-{cabecera.Correlativo}", fuenteTitulo, XBrushes.Black,
-            new XRect(xRecuadro, y + 40, anchoRecuadro, 20), XStringFormats.TopCenter);
+            new XRect(xRecuadro, y + 5, anchoRecuadro, 14), XStringFormats.TopCenter);
+        gfx.DrawString($"RUC: {empresa.Ruc}", fuenteTextoNegrita, XBrushes.Black,
+            new XRect(xRecuadro, y + 20, anchoRecuadro, 14), XStringFormats.TopCenter);
+        gfx.DrawString($"{cabecera.Serie}-{cabecera.Correlativo}", fuenteSubtitulo, XBrushes.Black,
+            new XRect(xRecuadro, y + 34, anchoRecuadro, 16), XStringFormats.TopCenter);
 
-        y += altoRecuadro + 55;
+        y += Math.Max(Math.Max(altoRecuadro + 20, 55), yCabeceraIzquierda - y + 10);
 
-        // Datos del receptor
+        // ===== Datos del comprobante: etiqueta : valor, alineado por columna =====
         gfx.DrawLine(XPens.Black, margen, y, margen + anchoUtil, y);
-        y += 12;
-        gfx.DrawString($"Señor(es): {cabecera.ClienteNombre}", fuenteTexto, XBrushes.Black, new XPoint(margen, y));
-        y += 12;
-        gfx.DrawString($"{DescripcionTipoDocumentoCliente(cabecera.ClienteTipoDocumentoCodigo)}: {cabecera.ClienteNumeroDocumento}", fuenteTexto, XBrushes.Black, new XPoint(margen, y));
-        y += 12;
-        gfx.DrawString($"Fecha de emisión: {cabecera.FechaEmision:dd/MM/yyyy}", fuenteTexto, XBrushes.Black, new XPoint(margen, y));
-        gfx.DrawString($"Moneda: {cabecera.MonedaCodigo}", fuenteTexto, XBrushes.Black, new XPoint(margen + anchoUtil / 2, y));
-        y += 18;
+        y += 8;
 
-        // Tabla de líneas
-        double[] anchosColumna = [40, 200, 50, 60, 65, 65];
-        string[] encabezados = ["CANT.", "DESCRIPCIÓN", "UND.", "P. UNIT.", "DSCTO.", "TOTAL"];
+        // Las 3 partes (etiqueta/":"/valor) de una misma fila van todas por XRect+TopLeft — mezclar eso con
+        // DrawString(..., XPoint) (que ancla por baseline, no por el techo del texto) hacía que el valor
+        // apareciera ~9pt más abajo que su propia etiqueta, calzando visualmente con la fila siguiente.
+        //
+        // Todo el bloque (etiqueta+":"+valor) ocupa solo la mitad izquierda de la página, no todo anchoUtil
+        // — si un valor no entra ahí, se envuelve: la línea siguiente de etiqueta arranca en margen (mismo
+        // x que la primera), la línea siguiente de valor arranca después del ":" (margen+anchoEtiqueta+8),
+        // nunca en margen.
+        const double anchoEtiqueta = 115;
+        var anchoBloqueCampos = anchoUtil / 2;
+        var anchoValorCampo = anchoBloqueCampos - anchoEtiqueta - 8;
 
-        gfx.DrawRectangle(XBrushes.LightGray, margen, y, anchoUtil, 16);
+        double DibujarCampo(string etiqueta, string valor)
+        {
+            var lineasEtiqueta = EnvolverTexto(gfx, fuenteTexto, etiqueta, anchoEtiqueta - 4);
+            var yEtiqueta = DibujarLineas(gfx, lineasEtiqueta, fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
+
+            var anchoEtiquetaReal = gfx.MeasureString(lineasEtiqueta[0], fuenteTexto).Width;
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiquetaReal + 4, y, 8, 12), XStringFormats.TopLeft);
+
+            var lineasValor = EnvolverTexto(gfx, fuenteTextoNegrita, valor, anchoValorCampo);
+            var yValor = DibujarLineas(gfx, lineasValor, fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, y, 12);
+
+            return Math.Max(yEtiqueta, yValor);
+        }
+
+        // Dirección y distrito-provincia-departamento van en líneas separadas (no concatenadas en un solo
+        // valor) para que calcen con la representación impresa de referencia de SUNAT.
+        double DibujarCampoDosLineas(string etiqueta, string valorLinea1, string valorLinea2)
+        {
+            var lineasEtiqueta = EnvolverTexto(gfx, fuenteTexto, etiqueta, anchoEtiqueta - 4);
+            var yEtiqueta = DibujarLineas(gfx, lineasEtiqueta, fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
+
+            var anchoEtiquetaReal = gfx.MeasureString(lineasEtiqueta[0], fuenteTexto).Width;
+            gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiquetaReal + 4, y, 8, 12), XStringFormats.TopLeft);
+
+            var yValor = y;
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea1, anchoValorCampo),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, yValor, 11);
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea2, anchoValorCampo),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampo, yValor, 11);
+
+            return Math.Max(yEtiqueta, yValor);
+        }
+
+        var yInicioCampos = y;
+
+        y = DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
+        y = DibujarCampo("Señor(es)", cabecera.ClienteNombre);
+        y = DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa) + 12;
+        y = DibujarCampo("Tipo de Moneda", nombreMoneda);
+        y = DibujarCampo("Observación", cabecera.NumeroReferencia ?? "") + 6;
+
+        // ===== Campos extra (texto libre cargado por el usuario, sin relación con SUNAT) — mitad derecha
+        // de la página, un renglón por campo, protegido contra overflow igual que todo lo demás. =====
+        if (documento.CamposExtra.Count > 0)
+        {
+            const double margenIzquierdoCamposExtra = 30;
+            var xCamposExtra = margen + anchoBloqueCampos + margenIzquierdoCamposExtra;
+            var anchoCamposExtra = anchoUtil - anchoBloqueCampos - margenIzquierdoCamposExtra;
+            var yCamposExtra = yInicioCampos;
+
+            foreach (var campoExtra in documento.CamposExtra)
+            {
+                yCamposExtra = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, campoExtra.Texto, anchoCamposExtra),
+                    fuenteTextoNegrita, xCamposExtra, anchoCamposExtra, yCamposExtra, 12);
+            }
+
+            y = Math.Max(y, yCamposExtra);
+        }
+
+        // ===== Tabla de líneas =====
+        double[] anchosColumna = [45, 75, anchoUtil - 45 - 75 - 70 - 60, 70, 60];
+        string[] encabezados = ["Cantidad", "Unidad Medida", "Descripción", "Valor Unitario", "ICBPER"];
+
+        gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, 16);
         double xCol = margen;
         for (var i = 0; i < encabezados.Length; i++)
         {
@@ -99,65 +192,111 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
             xCol += anchosColumna[i];
         }
         y += 16;
+        var yFilasInicio = y;
 
         foreach (var linea in documento.Lineas)
         {
-            var altoFila = 14;
+            // XGraphics.DrawString(texto, fuente, brush, XRect, formato) NO hace word-wrap por sí solo —
+            // el XRect solo se usa para alinear una única línea, el texto completo se dibuja de largo sin
+            // cortarse aunque se salga del rectángulo. Por eso la descripción se parte a mano en líneas
+            // (EnvolverTexto, midiendo ancho real con MeasureString) y se dibuja una DrawString por línea.
+            var anchoDescripcion = anchosColumna[2] - 6;
+            var lineasDescripcion = EnvolverTexto(gfx, fuenteTextoChico, linea.Descripcion, anchoDescripcion);
+            var altoFila = Math.Max(14, lineasDescripcion.Count * 10 + 4);
             xCol = margen;
             var valores = new[]
             {
                 linea.Cantidad.ToString("0.###", CultureInfo.InvariantCulture),
-                linea.Descripcion,
                 linea.UnidadMedidaCodigo,
-                linea.PrecioUnitario.ToString("F2", CultureInfo.InvariantCulture),
-                linea.MontoDescuento.ToString("F2", CultureInfo.InvariantCulture),
-                linea.TotalLinea.ToString("F2", CultureInfo.InvariantCulture)
+                string.Empty,
+                linea.ValorUnitario.ToString("F2", CultureInfo.InvariantCulture),
+                "0.00"
             };
             for (var i = 0; i < valores.Length; i++)
             {
-                var alineacion = i == 1 ? XStringFormats.TopLeft : XStringFormats.TopCenter;
-                gfx.DrawString(valores[i], fuenteTextoChico, XBrushes.Black,
-                    new XRect(xCol + (i == 1 ? 2 : 0), y + 3, anchosColumna[i] - (i == 1 ? 4 : 0), altoFila), alineacion);
+                if (i == 2)
+                {
+                    for (var l = 0; l < lineasDescripcion.Count; l++)
+                    {
+                        gfx.DrawString(lineasDescripcion[l], fuenteTextoChico, XBrushes.Black,
+                            new XRect(xCol + 3, y + 3 + l * 10, anchoDescripcion, 10), XStringFormats.TopLeft);
+                    }
+                }
+                else
+                {
+                    gfx.DrawString(valores[i], fuenteTextoChico, XBrushes.Black,
+                        new XRect(xCol, y + 3, anchosColumna[i], altoFila), XStringFormats.TopCenter);
+                }
                 xCol += anchosColumna[i];
             }
             gfx.DrawLine(XPens.LightGray, margen, y + altoFila, margen + anchoUtil, y + altoFila);
             y += altoFila;
         }
+        gfx.DrawRectangle(XPens.Black, margen, yFilasInicio, anchoUtil, y - yFilasInicio);
 
-        y += 10;
+        y += 12;
 
-        // Monto en letras (izquierda) + totales (derecha)
-        var montoLetras = NumeroALetrasConvertidor.Convertir(cabecera.TotalImporte, cabecera.MonedaCodigo);
-        gfx.DrawString(montoLetras, fuenteTextoChico, XBrushes.Black, new XRect(margen, y, anchoUtil * 0.55, 40), XStringFormats.TopLeft);
-
-        var anchoTotales = anchoUtil * 0.4;
+        // ===== Operaciones gratuitas (izquierda) + totales (derecha) =====
+        var anchoTotales = XUnit.FromMillimeter(75).Point;
         var xTotales = margen + anchoUtil - anchoTotales;
+        var anchoExportacion = anchoUtil - anchoTotales - 15;
+
+        var altoCajaExportacion = 24;
+        gfx.DrawRectangle(XPens.Black, margen, y, anchoExportacion, altoCajaExportacion);
+        gfx.DrawString("Valor de Venta de Exportación :", fuenteTexto, XBrushes.Black,
+            new XRect(margen + 4, y + 4, anchoExportacion * 0.65, 16), XStringFormats.TopLeft);
+        gfx.DrawString($"{simboloMoneda} {cabecera.TotalExportacion:F2}", fuenteTextoNegrita, XBrushes.Black,
+            new XRect(margen + anchoExportacion * 0.65, y + 4, anchoExportacion * 0.35 - 4, 16), XStringFormats.TopRight);
+
+        var ySon = y + altoCajaExportacion + 14;
+        var montoLetras = NumeroALetrasConvertidor.Convertir(cabecera.TotalImporte, cabecera.MonedaCodigo);
+        var yFinSon = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, montoLetras, anchoExportacion),
+            fuenteTextoNegrita, margen, anchoExportacion, ySon, 11);
+
+        // Totales (derecha): valor de venta ya viene neto de descuento por línea (ValorLinea), Descuentos
+        // acá es solo informativo (el monto ya está reflejado en TotalGravado/Exonerado/Inafecto/Exportacion).
+        // Todas las filas siempre visibles (aunque sean 0.00) — igual que la referencia, que muestra
+        // Anticipos/ISC/ICBPER/Otros Cargos/Otros Tributos/Monto de redondeo aunque valgan cero.
+        var subTotalVentas = cabecera.TotalGravado + cabecera.TotalExonerado + cabecera.TotalInafecto + cabecera.TotalExportacion;
         var filasTotales = new (string Etiqueta, decimal Monto)[]
         {
-            ("Op. Gravada", cabecera.TotalGravado),
-            ("Op. Exonerada", cabecera.TotalExonerado),
-            ("Op. Inafecta", cabecera.TotalInafecto),
-            ("Op. Gratuita", cabecera.TotalGratuito),
-            ("IGV", cabecera.TotalIgv),
+            ("Sub Total Ventas", subTotalVentas),
+            ("Anticipos", 0),
             ("Descuentos", cabecera.TotalDescuento),
-            ("IMPORTE TOTAL", cabecera.TotalImporte)
+            ("Valor Venta", subTotalVentas),
+            ("ISC", cabecera.TotalIsc),
+            ("IGV", cabecera.TotalIgv),
+            ("ICBPER", 0),
+            ("Otros Cargos", cabecera.TotalCargo),
+            ("Otros Tributos", cabecera.TotalOtrosTributos),
+            ("Monto de redondeo", 0),
+            ("Importe Total", cabecera.TotalImporte)
         };
 
         var yTotales = y;
+        var altoFilaTotal = 13.0;
+        var altoCajaTotales = filasTotales.Length * altoFilaTotal;
+        gfx.DrawRectangle(XPens.Black, xTotales, yTotales, anchoTotales, altoCajaTotales);
+
         foreach (var (etiqueta, monto) in filasTotales)
         {
-            if (monto == 0 && etiqueta is not ("IGV" or "IMPORTE TOTAL")) continue;
-
-            var fuente = etiqueta == "IMPORTE TOTAL" ? fuenteSubtitulo : fuenteTexto;
-            gfx.DrawString(etiqueta, fuente, XBrushes.Black, new XRect(xTotales, yTotales, anchoTotales * 0.55, 12), XStringFormats.TopLeft);
-            gfx.DrawString($"{cabecera.MonedaCodigo} {monto:F2}", fuente, XBrushes.Black,
-                new XRect(xTotales + anchoTotales * 0.55, yTotales, anchoTotales * 0.45, 12), XStringFormats.TopRight);
-            yTotales += 14;
+            var esImporteTotal = etiqueta == "Importe Total";
+            var fuente = esImporteTotal ? fuenteTextoNegrita : fuenteTexto;
+            gfx.DrawString(etiqueta, fuente, XBrushes.Black,
+                new XRect(xTotales + 4, yTotales + 2, anchoTotales * 0.6, 12), XStringFormats.TopLeft);
+            gfx.DrawString($"{simboloMoneda} {monto.ToString("F2", CultureInfo.InvariantCulture)}", fuente, XBrushes.Black,
+                new XRect(xTotales + anchoTotales * 0.6, yTotales + 2, anchoTotales * 0.4 - 4, 12), XStringFormats.TopRight);
+            if (etiqueta != filasTotales[^1].Etiqueta)
+            {
+                gfx.DrawLine(XPens.LightGray, xTotales, yTotales + altoFilaTotal, xTotales + anchoTotales, yTotales + altoFilaTotal);
+            }
+            yTotales += altoFilaTotal;
         }
 
-        y = Math.Max(y + 45, yTotales) + 15;
+        y = Math.Max(yFinSon + 10, yTotales + 15);
 
-        // QR (Anexo C, RS 113-2018/SUNAT): RUC|TipoDoc|Serie|Correlativo|IGV|Total|FechaEmision|TipoDocAdq|NumDocAdq|Hash
+        // ===== QR (Anexo C, RS 113-2018/SUNAT) =====
+        // RUC|TipoDoc|Serie|Correlativo|IGV|Total|FechaEmision|TipoDocAdq|NumDocAdq|Hash
         var contenidoQr = string.Join('|',
             empresa.Ruc, cabecera.TipoDocumentoCodigo, cabecera.Serie, cabecera.Correlativo,
             cabecera.TotalIgv.ToString("F2", CultureInfo.InvariantCulture),
@@ -166,38 +305,183 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
             cabecera.ClienteTipoDocumentoCodigo, cabecera.ClienteNumeroDocumento,
             sunatHash ?? "");
 
-        using var generadorQr = new QRCodeGenerator();
-        using var datosQr = generadorQr.CreateQrCode(contenidoQr, QRCodeGenerator.ECCLevel.M);
-        using var pngQr = new PngByteQRCode(datosQr);
-        var qrBytes = pngQr.GetGraphic(10);
-
-        using var streamQr = new MemoryStream(qrBytes);
-        using var imagenQr = XImage.FromStream(streamQr);
-        // Máximo 6cm x 6cm por norma — se usa un tamaño bastante menor, alcanza para lectura.
         var ladoQr = XUnit.FromMillimeter(28).Point;
-        gfx.DrawImage(imagenQr, margen, y, ladoQr, ladoQr);
+        DibujarQr(gfx, contenidoQr, margen, y, ladoQr);
 
         var xLeyenda = margen + ladoQr + 10;
         var anchoLeyenda = anchoUtil - ladoQr - 10;
-        gfx.DrawString(
-            $"Representación impresa de la {nombreTipoDocumento}. Código de verificación: {codigoVerificacion}",
-            fuenteTextoChico, XBrushes.Black, new XRect(xLeyenda, y, anchoLeyenda, 40), XStringFormats.TopLeft);
+
+        // XGraphics.DrawString con un XRect NO hace word-wrap por sí solo (solo alinea una única línea) —
+        // por eso cada párrafo se parte a mano con EnvolverTexto y se dibuja línea por línea con
+        // DibujarLineas. Al código/hash (que no traen espacios naturales) se les insertan espacios cada 8
+        // caracteres con InsertarEspacios solo para darle a EnvolverTexto puntos de corte — el valor real
+        // (sin espacios) es el que se usa en cualquier otro lado (QR, comparaciones, etc.), acá es
+        // puramente cosmético.
+        var yLeyenda = y;
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, $"Representación impresa de la {nombreTipoDocumento}.", anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, "Código de verificación:", anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+        yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, InsertarEspacios(codigoVerificacion, 8), anchoLeyenda),
+            fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
 
         if (!string.IsNullOrEmpty(sunatHash))
         {
-            gfx.DrawString($"Hash: {sunatHash}", fuenteTextoChico, XBrushes.Black,
-                new XRect(xLeyenda, y + 28, anchoLeyenda, 24), XStringFormats.TopLeft);
+            yLeyenda += 4;
+            yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, "Hash:", anchoLeyenda),
+                fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
+            yLeyenda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoChico, InsertarEspacios(sunatHash, 8), anchoLeyenda),
+                fuenteTextoChico, xLeyenda, anchoLeyenda, yLeyenda, 10);
         }
+
+        y += Math.Max(ladoQr, yLeyenda - y) + 12;
+
+        // ===== Leyenda final =====
+        // Alto calculado a partir de las líneas reales (EnvolverTexto) en vez de un valor fijo: a un largo
+        // fijo, si nombreTipoDocumento cambia (o la traducción del texto crece), el texto puede necesitar
+        // más líneas de las previstas y se sale por debajo del recuadro.
+        // SUNAT no genera esta representación impresa — la genera el propio emisor (este servicio), SUNAT
+        // solo valida/almacena el XML y devuelve el CDR. Decir "generada en el Sistema de SUNAT" era falso.
+        var textoLeyendaFinal =
+            $"Esta es una representación impresa de la {nombreTipoDocumento.ToLowerInvariant()}. " +
+            "Puede verificarla utilizando el código de verificación indicado arriba.";
+        var anchoLeyendaFinal = anchoUtil - 12;
+        var lineasLeyendaFinal = EnvolverTexto(gfx, fuenteTextoChico, textoLeyendaFinal, anchoLeyendaFinal);
+        var altoLeyenda = lineasLeyendaFinal.Count * 10 + 12;
+        gfx.DrawRectangle(XPens.Black, margen, y, anchoUtil, altoLeyenda);
+        DibujarLineas(gfx, lineasLeyendaFinal, fuenteTextoChico, margen + 6, anchoLeyendaFinal, y + 6, 10,
+            XStringFormats.TopCenter);
+
+        y += altoLeyenda + 6;
+
+        // ===== Borde exterior de toda la tarjeta =====
+        gfx.DrawRectangle(XPens.Black, margen - 6, yInicio - 6, anchoUtil + 12, y - yInicio + 12);
 
         using var salida = new MemoryStream();
         doc.Save(salida);
         return salida.ToArray();
     }
 
-    private static string DescripcionTipoDocumentoCliente(string codigo) => codigo switch
+    /// Se dibuja como rectángulos vectoriales (no como imagen PNG rasterizada): PdfSharp.Drawing.
+    /// XImage.FromStream no logra decodificar el PNG que produce QRCoder en Linux sin GDI+/libgdiplus
+    /// (System.InvalidOperationException: "Unsupported image format"). Cada fila se dibuja fusionando
+    /// corridas de módulos contiguos en un solo rectángulo (en vez de uno por módulo) — dibujar un
+    /// rectángulo por módulo dejaba líneas blancas finas entre módulos vecinos por redondeo de subpíxel
+    /// al renderizar el PDF; con una corrida por fila esas costuras internas desaparecen.
+    private static void DibujarQr(XGraphics gfx, string contenido, double x, double y, double lado)
     {
-        "6" => "RUC",
-        "1" => "DNI",
-        _ => "Documento"
-    };
+        using var generadorQr = new QRCodeGenerator();
+        using var datosQr = generadorQr.CreateQrCode(contenido, QRCodeGenerator.ECCLevel.M);
+        var matriz = datosQr.ModuleMatrix;
+        var numModulos = matriz.Count;
+        var ladoModulo = lado / numModulos;
+
+        // Un solo XGraphicsPath con todos los módulos (fusionados por corrida horizontal) y un único
+        // DrawPath — dibujar cada módulo/corrida como su propio DrawRectangle (intento anterior) dejaba
+        // costuras visibles entre rectángulos vecinos al rasterizar el PDF; al ser un solo path con un
+        // solo fill no hay bordes internos que puedan mostrar esa costura.
+        var path = new XGraphicsPath();
+        for (var fila = 0; fila < numModulos; fila++)
+        {
+            var columna = 0;
+            while (columna < numModulos)
+            {
+                if (!matriz[fila][columna])
+                {
+                    columna++;
+                    continue;
+                }
+
+                var inicioCorrida = columna;
+                while (columna < numModulos && matriz[fila][columna]) columna++;
+                var anchoCorrida = (columna - inicioCorrida) * ladoModulo;
+
+                path.AddRectangle(x + inicioCorrida * ladoModulo, y + fila * ladoModulo, anchoCorrida, ladoModulo);
+            }
+        }
+
+        gfx.DrawPath(XBrushes.Black, path);
+    }
+
+    /// XGraphics.DrawString(texto, fuente, brush, XRect, formato) NO hace word-wrap por sí solo — el XRect
+    /// solo alinea una única línea, el texto se dibuja de largo aunque se salga del rectángulo. Esto arma
+    /// a mano la lista de líneas (wrap "greedy por palabra", igual que un procesador de texto), midiendo
+    /// ancho real con MeasureString en vez de asumir un promedio de caracteres por línea.
+    private static List<string> EnvolverTexto(XGraphics gfx, XFont fuente, string texto, double anchoDisponible)
+    {
+        if (string.IsNullOrEmpty(texto)) return [string.Empty];
+
+        var anchoEspacio = gfx.MeasureString(" ", fuente).Width;
+        var lineas = new List<string>();
+        var lineaActual = string.Empty;
+        var anchoLineaActual = 0.0;
+
+        foreach (var palabra in texto.Split(' '))
+        {
+            var anchoPalabra = gfx.MeasureString(palabra, fuente).Width;
+
+            // Una palabra más ancha que la columna entera nunca va a entrar en una línea aunque esté sola
+            // — se corta carácter por carácter como último recurso, para no salirse del rectángulo.
+            if (anchoPalabra > anchoDisponible)
+            {
+                if (lineaActual.Length > 0)
+                {
+                    lineas.Add(lineaActual);
+                    lineaActual = string.Empty;
+                    anchoLineaActual = 0;
+                }
+
+                var trozo = string.Empty;
+                foreach (var caracter in palabra)
+                {
+                    if (trozo.Length > 0 && gfx.MeasureString(trozo + caracter, fuente).Width > anchoDisponible)
+                    {
+                        lineas.Add(trozo);
+                        trozo = string.Empty;
+                    }
+                    trozo += caracter;
+                }
+                lineaActual = trozo;
+                anchoLineaActual = gfx.MeasureString(trozo, fuente).Width;
+                continue;
+            }
+
+            if (lineaActual.Length > 0 && anchoLineaActual + anchoEspacio + anchoPalabra > anchoDisponible)
+            {
+                lineas.Add(lineaActual);
+                lineaActual = palabra;
+                anchoLineaActual = anchoPalabra;
+            }
+            else
+            {
+                anchoLineaActual = lineaActual.Length == 0 ? anchoPalabra : anchoLineaActual + anchoEspacio + anchoPalabra;
+                lineaActual = lineaActual.Length == 0 ? palabra : $"{lineaActual} {palabra}";
+            }
+        }
+
+        if (lineaActual.Length > 0) lineas.Add(lineaActual);
+        return lineas.Count > 0 ? lineas : [string.Empty];
+    }
+
+    private static double DibujarLineas(
+        XGraphics gfx, IReadOnlyList<string> lineas, XFont fuente, double x, double ancho, double y, double alturaLinea,
+        XStringFormat? formato = null)
+    {
+        foreach (var linea in lineas)
+        {
+            gfx.DrawString(linea, fuente, XBrushes.Black, new XRect(x, y, ancho, alturaLinea), formato ?? XStringFormats.TopLeft);
+            y += alturaLinea;
+        }
+        return y;
+    }
+
+    private static string InsertarEspacios(string valor, int cada)
+    {
+        var partes = new List<string>();
+        for (var i = 0; i < valor.Length; i += cada)
+        {
+            partes.Add(valor.Substring(i, Math.Min(cada, valor.Length - i)));
+        }
+        return string.Join(' ', partes);
+    }
 }

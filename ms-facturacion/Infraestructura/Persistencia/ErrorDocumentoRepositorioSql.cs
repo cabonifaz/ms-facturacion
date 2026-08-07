@@ -52,6 +52,48 @@ public sealed class ErrorDocumentoRepositorioSql(IConfiguration configuracion) :
         }
     }
 
+    public async Task<ResultadoOperacion<IReadOnlyList<ErrorDocumentoResumen>>> ListarUltimoEnvioAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_ErrorDocumento_ListarUltimoEnvio", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<ErrorDocumentoResumen>>(idTipoMensaje, mensaje, default);
+            }
+
+            var errores = new List<ErrorDocumentoResumen>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                errores.Add(new ErrorDocumentoResumen(
+                    lector.GetInt32(lector.GetOrdinal("IdErrorDocumento")),
+                    lector.GetString(lector.GetOrdinal("OrigenErrorCodigo")),
+                    lector.GetString(lector.GetOrdinal("CodigoError")),
+                    lector.GetString(lector.GetOrdinal("MensajeError")),
+                    lector.IsDBNull(lector.GetOrdinal("Campo")) ? null : lector.GetString(lector.GetOrdinal("Campo")),
+                    lector.GetString(lector.GetOrdinal("SeveridadCodigo")),
+                    lector.GetDateTime(lector.GetOrdinal("FchCre"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<ErrorDocumentoResumen>>.DeExito(mensaje, errores);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<ErrorDocumentoResumen>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
         SqlDataReader lector, CancellationToken cancellationToken)
     {

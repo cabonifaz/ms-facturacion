@@ -16,9 +16,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
+        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -34,6 +35,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.Add("@tmHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
             comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
@@ -54,6 +56,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
             tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO";
             tvpCuotas.Value = ConstruirTablaCuotas(cuotas);
+
+            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
+            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO";
+            tvpCamposExtra.Value = ConstruirTablaCamposExtra(camposExtra);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -119,6 +125,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 FechaEmision = DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                 HoraEmision = TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
                 MonedaCodigo = lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                TipoCambio = lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
                 TipoOperacionCodigo = lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
                 FormaPagoCodigo = lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                 EmpresaRuc = lector.GetString(lector.GetOrdinal("EmpresaRuc")),
@@ -135,7 +142,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 TotalGravado = lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
                 TotalInafecto = lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
                 TotalExonerado = lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
-                TotalGratuito = lector.GetDecimal(lector.GetOrdinal("TotalGratuito")),
+                TotalExportacion = lector.GetDecimal(lector.GetOrdinal("TotalExportacion")),
                 TotalIgv = lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
                 TotalIsc = lector.GetDecimal(lector.GetOrdinal("TotalIsc")),
                 TotalOtrosTributos = lector.GetDecimal(lector.GetOrdinal("TotalOtrosTributos")),
@@ -204,7 +211,16 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 cuotas.Add(LeerCuota(lector));
             }
 
-            var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas);
+            // Result set 6: campos extra
+            await lector.NextResultAsync(cancellationToken);
+            var camposExtra = new List<CampoExtraEntrada>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                camposExtra.Add(new CampoExtraEntrada(
+                    lector.GetString(lector.GetOrdinal("Texto"))));
+            }
+
+            var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas, camposExtra);
             return ResultadoOperacion<DocumentoElectronicoDetalle>.DeExito(mensaje, detalle);
         }
         catch (Exception ex)
@@ -242,6 +258,134 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         catch (Exception ex)
         {
             return ResultadoOperacion<string>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<DocumentoElectronicoDetallePublico>(idTipoMensaje, mensaje, default);
+            }
+
+            // Result set 2: cabecera
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var cabecera = new DocumentoElectronicoPublico(
+                LeerNullableString(lector, "NumeroReferencia"),
+                lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                lector.GetString(lector.GetOrdinal("Serie")),
+                lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
+                lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
+                lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
+                lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
+                lector.GetString(lector.GetOrdinal("EmpresaRuc")),
+                lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
+                LeerNullableString(lector, "EmpresaNombreComercial"),
+                lector.GetString(lector.GetOrdinal("EmpresaDireccion")),
+                lector.GetString(lector.GetOrdinal("EmpresaUbigeo")),
+                lector.GetString(lector.GetOrdinal("ClienteTipoDocumentoCodigo")),
+                lector.GetString(lector.GetOrdinal("ClienteNumeroDocumento")),
+                lector.GetString(lector.GetOrdinal("ClienteNombre")),
+                LeerNullableString(lector, "ClienteDireccion"),
+                LeerNullableString(lector, "ClienteCorreo"),
+                lector.GetString(lector.GetOrdinal("ClientePaisCodigo")),
+                lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
+                lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
+                lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
+                lector.GetDecimal(lector.GetOrdinal("TotalExportacion")),
+                lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
+                lector.GetDecimal(lector.GetOrdinal("TotalIsc")),
+                lector.GetDecimal(lector.GetOrdinal("TotalOtrosTributos")),
+                lector.GetDecimal(lector.GetOrdinal("TotalDescuento")),
+                lector.GetDecimal(lector.GetOrdinal("TotalCargo")),
+                lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                LeerNullableString(lector, "SunatHash"),
+                LeerNullableString(lector, "SunatCodigoRespuesta"),
+                LeerNullableString(lector, "SunatDescripcionRespuesta"),
+                LeerNullableDateTime(lector, "FechaAceptacion"),
+                LeerNullableDateTime(lector, "FechaRechazo"),
+                LeerNullableDateTime(lector, "FechaAnulacion"),
+                lector.GetDateTime(lector.GetOrdinal("FchCre")));
+
+            // Result set 3: líneas
+            await lector.NextResultAsync(cancellationToken);
+            var lineas = new List<LineaDocumentoElectronicoPublica>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                lineas.Add(new LineaDocumentoElectronicoPublica(
+                    lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableString(lector, "ProductoSunatCodigo"),
+                    lector.GetString(lector.GetOrdinal("Descripcion")),
+                    lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
+                    lector.GetDecimal(lector.GetOrdinal("Cantidad")),
+                    lector.GetDecimal(lector.GetOrdinal("ValorUnitario")),
+                    lector.GetDecimal(lector.GetOrdinal("PrecioUnitario")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoDescuento")),
+                    lector.GetString(lector.GetOrdinal("AfectacionIgvCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoSunatCodigo")),
+                    lector.GetString(lector.GetOrdinal("TributoNombre")),
+                    lector.GetString(lector.GetOrdinal("TributoTaxTypeCode")),
+                    lector.GetString(lector.GetOrdinal("TributoCategoria")),
+                    lector.GetDecimal(lector.GetOrdinal("PorcentajeIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoIsc")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoOtrosTributos")),
+                    lector.GetDecimal(lector.GetOrdinal("ValorLinea")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalLinea"))));
+            }
+
+            // Result set 4: referencia (0 o 1 fila — solo notas de crédito/débito)
+            await lector.NextResultAsync(cancellationToken);
+            ReferenciaDocumentoElectronicaPublica? referencia = null;
+            if (await lector.ReadAsync(cancellationToken))
+            {
+                referencia = new ReferenciaDocumentoElectronicaPublica(
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
+                    lector.GetString(lector.GetOrdinal("SerieRelacionada")),
+                    lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
+                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
+                    lector.GetString(lector.GetOrdinal("MotivoCodigo")),
+                    lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
+            }
+
+            // Result set 5: cuotas (0 filas si fue Contado)
+            await lector.NextResultAsync(cancellationToken);
+            var cuotas = new List<CuotaDocumentoElectronicaPublica>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                cuotas.Add(new CuotaDocumentoElectronicaPublica(
+                    lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
+                    lector.GetDecimal(lector.GetOrdinal("Monto")),
+                    lector.GetString(lector.GetOrdinal("EstadoCuotaCodigo")),
+                    LeerNullableDateTime(lector, "FechaPago")));
+            }
+
+            var detalle = new DocumentoElectronicoDetallePublico(cabecera, lineas, referencia, cuotas);
+            return ResultadoOperacion<DocumentoElectronicoDetallePublico>.DeExito(mensaje, detalle);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<DocumentoElectronicoDetallePublico>.DeErrorSistema(ex.Message);
         }
     }
 
@@ -345,6 +489,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                     lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                     lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("MonedaIcono")),
                     lector.GetString(lector.GetOrdinal("EstadoCodigo")),
                     lector.GetString(lector.GetOrdinal("ColorLetra")),
                     lector.GetString(lector.GetOrdinal("ColorFondo"))));
@@ -356,6 +501,66 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         catch (Exception ex)
         {
             return ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>> ListarParaSireRvieAsync(
+        int idInquilino, int idEmpresa, DateOnly periodo, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarParaSireRvie", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtPeriodo", periodo.ToDateTime(TimeOnly.MinValue));
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>(idTipoMensaje, mensaje, default);
+            }
+
+            var documentos = new List<DocumentoSireRvie>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                documentos.Add(new DocumentoSireRvie(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("EmpresaRuc")),
+                    lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("Serie")),
+                    lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                    lector.GetString(lector.GetOrdinal("ClienteTipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("ClienteNumeroDocumento")),
+                    lector.GetString(lector.GetOrdinal("ClienteNombre")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalExportacion")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIsc")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalOtrosTributos")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                    LeerNullableDecimal(lector, "TipoCambio"),
+                    LeerNullableDateOnly(lector, "FechaEmisionDocModificado"),
+                    LeerNullableString(lector, "TipoDocumentoRelacionadoCodigo"),
+                    LeerNullableString(lector, "SerieRelacionada"),
+                    LeerNullableInt(lector, "CorrelativoRelacionado")));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>.DeExito(mensaje, documentos);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>.DeErrorSistema(ex.Message);
         }
     }
 
@@ -432,9 +637,9 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, int idTipoOperacionMaestro,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
-        CancellationToken cancellationToken)
+        IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
     {
         try
         {
@@ -447,6 +652,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
@@ -456,6 +662,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
             tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION";
             tvpCuotas.Value = ConstruirTablaCuotasEdicion(cuotas);
+
+            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
+            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION";
+            tvpCamposExtra.Value = ConstruirTablaCamposExtraEdicion(camposExtra);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -681,10 +891,58 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         return tabla;
     }
 
+    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO
+    /// (02_CrearTipos_MsFacturacion.sql) — una TVP basada en DataTable se mapea posicionalmente, no por nombre.
+    private static DataTable ConstruirTablaCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra)
+    {
+        var tabla = new DataTable();
+        tabla.Columns.Add("Texto", typeof(string));
+
+        foreach (var campo in camposExtra)
+        {
+            tabla.Rows.Add(campo.Texto);
+        }
+
+        return tabla;
+    }
+
+    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION.
+    private static DataTable ConstruirTablaCamposExtraEdicion(IReadOnlyList<CampoExtraEntrada> camposExtra)
+    {
+        var tabla = new DataTable();
+        tabla.Columns.Add("IdCampoExtraDocumentoElectronico", typeof(int));
+        tabla.Columns.Add("Texto", typeof(string));
+
+        foreach (var campo in camposExtra)
+        {
+            tabla.Rows.Add(campo.IdCampoExtraDocumentoElectronico, campo.Texto);
+        }
+
+        return tabla;
+    }
+
     private static string? LeerNullableString(SqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
+    }
+
+    private static decimal? LeerNullableDecimal(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : lector.GetDecimal(ordinal);
+    }
+
+    private static int? LeerNullableInt(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : lector.GetInt32(ordinal);
+    }
+
+    private static DateOnly? LeerNullableDateOnly(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : DateOnly.FromDateTime(lector.GetDateTime(ordinal));
     }
 
     private static DateTime? LeerNullableDateTime(SqlDataReader lector, string columna)

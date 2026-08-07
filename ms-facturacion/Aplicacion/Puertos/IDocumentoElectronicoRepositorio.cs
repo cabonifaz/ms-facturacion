@@ -8,9 +8,10 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken);
+        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<DocumentoElectronicoDetalle>> ObtenerAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
@@ -19,6 +20,13 @@ public interface IDocumentoElectronicoRepositorio
     /// no forma parte de DocumentoElectronico/ObtenerAsync a propósito (ese no debe exponerlo vía API).
     Task<ResultadoOperacion<string>> ObtenerTokenPublicoAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
+
+    /// Camino inverso a ObtenerTokenPublicoAsync: dado el token público (el "código de verificación" del
+    /// PDF), devuelve el documento — puerta de entrada de la verificación pública (link con solo el token,
+    /// sin idInquilino, sin autenticación). Proyección pública sin ningún Id* interno, ver
+    /// SP_DocumentoElectronico_ObtenerPorToken y DocumentoElectronicoDetallePublico.
+    Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
@@ -29,6 +37,12 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<ResultadoPaginado<FacturaResumenPedidoFactura>>> ListarParaPedidoFacturaAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, int? idFormaPago, DateOnly? fechaDesde, DateOnly? fechaHasta,
         string? busqueda, int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);
+
+    /// Documentos de un período (cualquier fecha del mes) ya listos para el generador del TXT SIRE RVIE —
+    /// ver SP_DocumentoElectronico_ListarParaSireRvie y SIRE_RVIE_Estructura_Campos.md. Sin paginación: un
+    /// período se exporta entero.
+    Task<ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>> ListarParaSireRvieAsync(
+        int idInquilino, int idEmpresa, DateOnly periodo, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> ActualizarEstadoSunatAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
@@ -43,9 +57,9 @@ public interface IDocumentoElectronicoRepositorio
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, int idTipoOperacionMaestro,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
-        CancellationToken cancellationToken);
+        IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 
     /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo
     /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT.
