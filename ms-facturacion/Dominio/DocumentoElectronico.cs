@@ -43,7 +43,9 @@ public sealed class DocumentoElectronico
     public required decimal TotalGravado { get; init; }
     public required decimal TotalInafecto { get; init; }
     public required decimal TotalExonerado { get; init; }
-    public required decimal TotalGratuito { get; init; }
+    /// Solo agrupa código SUNAT 40 (Exportación de Bienes o Servicios) — pese al nombre, nunca fue un
+    /// bucket de "operaciones gratuitas" literal (esas se folded en Gravado/Exonerado/Inafecto).
+    public required decimal TotalExportacion { get; init; }
     public required decimal TotalIgv { get; init; }
     public required decimal TotalIsc { get; init; }
     public required decimal TotalOtrosTributos { get; init; }

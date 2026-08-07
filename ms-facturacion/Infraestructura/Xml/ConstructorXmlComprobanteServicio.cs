@@ -221,7 +221,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     }
 
     /// SUNAT exige un cac:TaxSubtotal por cada tributo que aparezca en al menos una línea (fault 2638) —
-    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Gratuito) agrupan por
+    /// las 4 columnas de bucket en cabecera (TotalGravado/Exonerado/Inafecto/Exportacion) agrupan por
     /// Num2/AfectacionIgvCodigo, NO por tributo real: un mismo bucket Gravado puede mezclar líneas con
     /// tributo 1000 y 9996 a la vez (ver fix de fault 2040), así que no sirven para armar este total —
     /// hay que agrupar las líneas por su propio TributoSunatCodigo.
@@ -259,7 +259,7 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
     /// (DebitNote) — mismos hijos en los tres casos.
     private XElement ConstruirTotalMonetario(string elementoTotalMonetario, DocumentoElectronico cabecera, string moneda)
     {
-        var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalGratuito;
+        var lineExtensionAmount = cabecera.TotalGravado + cabecera.TotalInafecto + cabecera.TotalExonerado + cabecera.TotalExportacion;
 
         return new XElement(Cac + elementoTotalMonetario,
             new XElement(Cbc + "LineExtensionAmount", new XAttribute("currencyID", moneda), lineExtensionAmount.ToString("F2", CultureInfo.InvariantCulture)),

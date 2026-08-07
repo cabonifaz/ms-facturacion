@@ -239,25 +239,25 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         // ===== Operaciones gratuitas (izquierda) + totales (derecha) =====
         var anchoTotales = XUnit.FromMillimeter(75).Point;
         var xTotales = margen + anchoUtil - anchoTotales;
-        var anchoGratuitas = anchoUtil - anchoTotales - 15;
+        var anchoExportacion = anchoUtil - anchoTotales - 15;
 
-        var altoCajaGratuitas = 24;
-        gfx.DrawRectangle(XPens.Black, margen, y, anchoGratuitas, altoCajaGratuitas);
-        gfx.DrawString("Valor de Venta de Operaciones Gratuitas :", fuenteTexto, XBrushes.Black,
-            new XRect(margen + 4, y + 4, anchoGratuitas * 0.65, 16), XStringFormats.TopLeft);
-        gfx.DrawString($"{simboloMoneda} {cabecera.TotalGratuito:F2}", fuenteTextoNegrita, XBrushes.Black,
-            new XRect(margen + anchoGratuitas * 0.65, y + 4, anchoGratuitas * 0.35 - 4, 16), XStringFormats.TopRight);
+        var altoCajaExportacion = 24;
+        gfx.DrawRectangle(XPens.Black, margen, y, anchoExportacion, altoCajaExportacion);
+        gfx.DrawString("Valor de Venta de Exportación :", fuenteTexto, XBrushes.Black,
+            new XRect(margen + 4, y + 4, anchoExportacion * 0.65, 16), XStringFormats.TopLeft);
+        gfx.DrawString($"{simboloMoneda} {cabecera.TotalExportacion:F2}", fuenteTextoNegrita, XBrushes.Black,
+            new XRect(margen + anchoExportacion * 0.65, y + 4, anchoExportacion * 0.35 - 4, 16), XStringFormats.TopRight);
 
-        var ySon = y + altoCajaGratuitas + 14;
+        var ySon = y + altoCajaExportacion + 14;
         var montoLetras = NumeroALetrasConvertidor.Convertir(cabecera.TotalImporte, cabecera.MonedaCodigo);
-        var yFinSon = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, montoLetras, anchoGratuitas),
-            fuenteTextoNegrita, margen, anchoGratuitas, ySon, 11);
+        var yFinSon = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, montoLetras, anchoExportacion),
+            fuenteTextoNegrita, margen, anchoExportacion, ySon, 11);
 
         // Totales (derecha): valor de venta ya viene neto de descuento por línea (ValorLinea), Descuentos
-        // acá es solo informativo (el monto ya está reflejado en TotalGravado/Exonerado/Inafecto/Gratuito).
+        // acá es solo informativo (el monto ya está reflejado en TotalGravado/Exonerado/Inafecto/Exportacion).
         // Todas las filas siempre visibles (aunque sean 0.00) — igual que la referencia, que muestra
         // Anticipos/ISC/ICBPER/Otros Cargos/Otros Tributos/Monto de redondeo aunque valgan cero.
-        var subTotalVentas = cabecera.TotalGravado + cabecera.TotalExonerado + cabecera.TotalInafecto + cabecera.TotalGratuito;
+        var subTotalVentas = cabecera.TotalGravado + cabecera.TotalExonerado + cabecera.TotalInafecto + cabecera.TotalExportacion;
         var filasTotales = new (string Etiqueta, decimal Monto)[]
         {
             ("Sub Total Ventas", subTotalVentas),

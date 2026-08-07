@@ -15,7 +15,7 @@ public sealed record DocumentoElectronicoPublico(
     string EmpresaRuc, string EmpresaRazonSocial, string? EmpresaNombreComercial, string EmpresaDireccion, string EmpresaUbigeo,
     string ClienteTipoDocumentoCodigo, string ClienteNumeroDocumento, string ClienteNombre, string? ClienteDireccion,
     string? ClienteCorreo, string ClientePaisCodigo,
-    decimal TotalGravado, decimal TotalInafecto, decimal TotalExonerado, decimal TotalGratuito, decimal TotalIgv,
+    decimal TotalGravado, decimal TotalInafecto, decimal TotalExonerado, decimal TotalExportacion, decimal TotalIgv,
     decimal TotalIsc, decimal TotalOtrosTributos, decimal TotalDescuento, decimal TotalCargo, decimal TotalImporte,
     string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta,
     DateTime? FechaAceptacion, DateTime? FechaRechazo, DateTime? FechaAnulacion, DateTime FchCre);
