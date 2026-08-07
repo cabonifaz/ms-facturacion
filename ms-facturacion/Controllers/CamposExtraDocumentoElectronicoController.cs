@@ -5,8 +5,8 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Controllers;
 
-public sealed record CampoExtraPeticion(string Etiqueta, string Valor);
-public sealed record InsertarCampoExtraPeticion(int IdInquilino, int IdDocumentoElectronico, string Etiqueta, string Valor);
+public sealed record CampoExtraPeticion(string Texto);
+public sealed record InsertarCampoExtraPeticion(int IdInquilino, int IdDocumentoElectronico, string Texto);
 public sealed record InsertarLoteCamposExtraPeticion(int IdInquilino, int IdDocumentoElectronico, IReadOnlyList<CampoExtraPeticion> CamposExtra);
 
 [ApiController]
@@ -26,7 +26,7 @@ public sealed class CamposExtraDocumentoElectronicoController(
     {
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdDocumentoElectronico,
-            new CampoExtraEntrada(peticion.Etiqueta, peticion.Valor), cancellationToken);
+            new CampoExtraEntrada(peticion.Texto), cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
@@ -34,7 +34,7 @@ public sealed class CamposExtraDocumentoElectronicoController(
     [HttpPost("lote")]
     public async Task<IActionResult> InsertarLote(InsertarLoteCamposExtraPeticion peticion, CancellationToken cancellationToken)
     {
-        var camposExtra = peticion.CamposExtra.Select(c => new CampoExtraEntrada(c.Etiqueta, c.Valor)).ToList();
+        var camposExtra = peticion.CamposExtra.Select(c => new CampoExtraEntrada(c.Texto)).ToList();
 
         var resultado = await insertarLoteCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdDocumentoElectronico, camposExtra, cancellationToken);
@@ -56,7 +56,7 @@ public sealed class CamposExtraDocumentoElectronicoController(
     {
         var resultado = await actualizarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idCampoExtraDocumentoElectronico,
-            new CampoExtraEntrada(peticion.Etiqueta, peticion.Valor), cancellationToken);
+            new CampoExtraEntrada(peticion.Texto), cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

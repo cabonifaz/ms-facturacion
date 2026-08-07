@@ -10,7 +10,8 @@ public interface IDocumentoElectronicoRepositorio
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken);
+        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<DocumentoElectronicoDetalle>> ObtenerAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
@@ -52,7 +53,7 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
-        CancellationToken cancellationToken);
+        IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 
     /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo
     /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT.

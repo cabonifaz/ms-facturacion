@@ -258,18 +258,13 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 
         y = Math.Max(yFinSon + 10, yTotales + 15);
 
-        // ===== Campos extra (pares libres etiqueta/valor cargados por el usuario, sin relación con SUNAT) =====
+        // ===== Campos extra (texto libre cargado por el usuario, sin relación con SUNAT) =====
         if (documento.CamposExtra.Count > 0)
         {
             foreach (var campoExtra in documento.CamposExtra)
             {
-                var anchoValorCampoExtra = anchoUtil - anchoEtiqueta - 8;
-                gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
-                var yEtiqueta = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, campoExtra.Etiqueta, anchoEtiqueta - 4),
-                    fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
-                var yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, campoExtra.Valor, anchoValorCampoExtra),
-                    fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampoExtra, y, 12);
-                y = Math.Max(yEtiqueta, yValor);
+                y = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, campoExtra.Texto, anchoUtil),
+                    fuenteTexto, margen, anchoUtil, y, 12);
             }
             y += 6;
         }

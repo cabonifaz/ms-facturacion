@@ -25,8 +25,7 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchEtiqueta", campo.Etiqueta);
-            comando.Parameters.AddWithValue("@vchValor", campo.Valor);
+            comando.Parameters.AddWithValue("@vchTexto", campo.Texto);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -116,8 +115,7 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
             {
                 camposExtra.Add(new CampoExtraDocumentoElectronico(
                     lector.GetInt32(lector.GetOrdinal("IdCampoExtraDocumentoElectronico")),
-                    lector.GetString(lector.GetOrdinal("Etiqueta")),
-                    lector.GetString(lector.GetOrdinal("Valor"))));
+                    lector.GetString(lector.GetOrdinal("Texto"))));
             }
 
             return ResultadoOperacion<IReadOnlyList<CampoExtraDocumentoElectronico>>.DeExito(mensaje, camposExtra);
@@ -140,8 +138,7 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdCampoExtraDocumentoElectronico", idCampoExtraDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchEtiqueta", campo.Etiqueta);
-            comando.Parameters.AddWithValue("@vchValor", campo.Valor);
+            comando.Parameters.AddWithValue("@vchTexto", campo.Texto);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -202,12 +199,11 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     private static DataTable ConstruirTablaCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra)
     {
         var tabla = new DataTable();
-        tabla.Columns.Add("Etiqueta", typeof(string));
-        tabla.Columns.Add("Valor", typeof(string));
+        tabla.Columns.Add("Texto", typeof(string));
 
         foreach (var campo in camposExtra)
         {
-            tabla.Rows.Add(campo.Etiqueta, campo.Valor);
+            tabla.Rows.Add(campo.Texto);
         }
 
         return tabla;

@@ -20,7 +20,7 @@ public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
     int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
     FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
-    IReadOnlyList<ItemPeticion> Items);
+    IReadOnlyList<ItemPeticion> Items, IReadOnlyList<CampoExtraPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoSunatPeticion(
     EstadoMaestroCodigo EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
@@ -36,9 +36,14 @@ public sealed record LineaEdicionPeticion(
 public sealed record CuotaEdicionPeticion(
     DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
 
+/// Campo extra dentro de "Guardar cambios" en lote — mismo criterio de IdCampoExtraDocumentoElectronico
+/// que LineaEdicionPeticion/CuotaEdicionPeticion.
+public sealed record CampoExtraEdicionPeticion(string Texto, int IdCampoExtraDocumentoElectronico = 0);
+
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
     int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
-    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas);
+    IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
+    IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
@@ -87,11 +92,15 @@ public sealed class DocumentosElectronicosController(
             .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
             .ToList();
 
+        var camposExtra = (peticion.CamposExtra ?? [])
+            .Select(c => new CampoExtraEntrada(c.Texto))
+            .ToList();
+
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno, peticion.NumeroReferencia,
             peticion.IdTipoDocumentoMaestro,
             peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
-            documentoAfectado, lineas, cuotas, cancellationToken);
+            documentoAfectado, lineas, cuotas, camposExtra, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
@@ -117,9 +126,13 @@ public sealed class DocumentosElectronicosController(
                 cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdCuotaDocumentoElectronico))
             .ToList();
 
+        var camposExtra = (peticion.CamposExtra ?? [])
+            .Select(c => new CampoExtraEntrada(c.Texto, c.IdCampoExtraDocumentoElectronico))
+            .ToList();
+
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
-            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, lineas, cuotas, cancellationToken);
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, lineas, cuotas, camposExtra, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

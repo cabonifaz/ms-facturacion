@@ -18,7 +18,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
+        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -55,6 +56,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
             tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO";
             tvpCuotas.Value = ConstruirTablaCuotas(cuotas);
+
+            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
+            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO";
+            tvpCamposExtra.Value = ConstruirTablaCamposExtra(camposExtra);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -212,8 +217,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             while (await lector.ReadAsync(cancellationToken))
             {
                 camposExtra.Add(new CampoExtraEntrada(
-                    lector.GetString(lector.GetOrdinal("Etiqueta")),
-                    lector.GetString(lector.GetOrdinal("Valor"))));
+                    lector.GetString(lector.GetOrdinal("Texto"))));
             }
 
             var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas, camposExtra);
@@ -575,7 +579,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
-        CancellationToken cancellationToken)
+        IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
     {
         try
         {
@@ -598,6 +602,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
             tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION";
             tvpCuotas.Value = ConstruirTablaCuotasEdicion(cuotas);
+
+            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
+            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION";
+            tvpCamposExtra.Value = ConstruirTablaCamposExtraEdicion(camposExtra);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -818,6 +826,36 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         foreach (var cuota in cuotas)
         {
             tabla.Rows.Add(cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto);
+        }
+
+        return tabla;
+    }
+
+    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO
+    /// (02_CrearTipos_MsFacturacion.sql) — una TVP basada en DataTable se mapea posicionalmente, no por nombre.
+    private static DataTable ConstruirTablaCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra)
+    {
+        var tabla = new DataTable();
+        tabla.Columns.Add("Texto", typeof(string));
+
+        foreach (var campo in camposExtra)
+        {
+            tabla.Rows.Add(campo.Texto);
+        }
+
+        return tabla;
+    }
+
+    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION.
+    private static DataTable ConstruirTablaCamposExtraEdicion(IReadOnlyList<CampoExtraEntrada> camposExtra)
+    {
+        var tabla = new DataTable();
+        tabla.Columns.Add("IdCampoExtraDocumentoElectronico", typeof(int));
+        tabla.Columns.Add("Texto", typeof(string));
+
+        foreach (var campo in camposExtra)
+        {
+            tabla.Rows.Add(campo.IdCampoExtraDocumentoElectronico, campo.Texto);
         }
 
         return tabla;
