@@ -38,6 +38,12 @@ public interface IDocumentoElectronicoRepositorio
         int idInquilino, int idEmpresa, string? estadoCodigo, int? idFormaPago, DateOnly? fechaDesde, DateOnly? fechaHasta,
         string? busqueda, int numeroPagina, int tamanoPagina, CancellationToken cancellationToken);
 
+    /// Documentos de un período (cualquier fecha del mes) ya listos para el generador del TXT SIRE RVIE —
+    /// ver SP_DocumentoElectronico_ListarParaSireRvie y SIRE_RVIE_Estructura_Campos.md. Sin paginación: un
+    /// período se exporta entero.
+    Task<ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>> ListarParaSireRvieAsync(
+        int idInquilino, int idEmpresa, DateOnly periodo, CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> ActualizarEstadoSunatAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken);

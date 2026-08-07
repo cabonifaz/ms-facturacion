@@ -13,6 +13,7 @@ using ms_facturacion.Infraestructura.Cifrado;
 using ms_facturacion.Infraestructura.Pdf;
 using ms_facturacion.Infraestructura.Persistencia;
 using ms_facturacion.Infraestructura.Seguridad;
+using ms_facturacion.Infraestructura.Sire;
 using ms_facturacion.Infraestructura.Sunat;
 using ms_facturacion.Infraestructura.Workers;
 using ms_facturacion.Infraestructura.Xml;
@@ -63,6 +64,7 @@ builder.Services.AddScoped<ICampoExtraDocumentoElectronicoRepositorio, CampoExtr
 // Módulo 4 — Worker (construir/firmar/empaquetar/enviar a SUNAT)
 builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlComprobanteServicio>();
 builder.Services.AddScoped<IGeneradorPdfComprobanteServicio, GeneradorPdfComprobanteServicio>();
+builder.Services.AddScoped<IGeneradorSireRvieServicio, GeneradorSireRvieServicio>();
 builder.Services.AddScoped<IConstructorXmlBajaServicio, ConstructorXmlBajaServicio>();
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
@@ -98,6 +100,8 @@ builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoPorTokenCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso>();
+builder.Services.AddScoped<ListarDocumentosParaSireRvieCasoDeUso>();
+builder.Services.AddScoped<GenerarTxtSireRvieCasoDeUso>();
 builder.Services.AddScoped<ObtenerUrlDescargaDocumentoCasoDeUso>();
 builder.Services.AddScoped<ObtenerUrlDescargaPorTokenCasoDeUso>();
 builder.Services.AddScoped<ObtenerTokenVerificacionDocumentoCasoDeUso>();

@@ -54,6 +54,8 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoCasoDeUso obtenerCasoDeUso,
     ListarDocumentosElectronicosCasoDeUso listarCasoDeUso,
     ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso listarParaPedidoFacturaCasoDeUso,
+    ListarDocumentosParaSireRvieCasoDeUso listarParaSireRvieCasoDeUso,
+    GenerarTxtSireRvieCasoDeUso generarTxtSireRvieCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
@@ -220,6 +222,33 @@ public sealed class DocumentosElectronicosController(
             idInquilino, idEmpresa, estadoCodigo, idFormaPago, fechaDesde, fechaHasta, busqueda, pagina, tamanoPagina, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
+    }
+
+    // SIRE RVIE (Formato 14.4) — documentos de un período ya con todos los campos resueltos para el
+    // generador del TXT (ver SP_DocumentoElectronico_ListarParaSireRvie y SIRE_RVIE_Estructura_Campos.md).
+    [HttpGet("sire-rvie")]
+    public async Task<IActionResult> ListarParaSireRvie(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly periodo,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await listarParaSireRvieCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, periodo, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Devuelve el TXT ya armado (no el JSON de arriba) — descarga directa, listo para comprimir en ZIP y
+    // subir al módulo SIRE. Codificado en ISO-8859-1 (ver GeneradorSireRvieServicio).
+    [HttpGet("sire-rvie/txt")]
+    public async Task<IActionResult> GenerarTxtSireRvie(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly periodo,
+        CancellationToken cancellationToken)
+    {
+        var resultado = await generarTxtSireRvieCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, periodo, cancellationToken);
+        if (resultado.IdTipoMensaje != TipoMensaje.Exito || resultado.Datos is null)
+        {
+            return ResponderSegunEnvelope(resultado);
+        }
+
+        return File(resultado.Datos.Contenido, "text/plain", resultado.Datos.NombreArchivo);
     }
 
     // Uso exclusivo del Worker (Módulo 4) — no es un Actualizar genérico, solo aplica la respuesta de SUNAT.

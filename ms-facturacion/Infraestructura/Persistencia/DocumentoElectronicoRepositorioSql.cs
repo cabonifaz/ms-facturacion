@@ -504,6 +504,66 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>> ListarParaSireRvieAsync(
+        int idInquilino, int idEmpresa, DateOnly periodo, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarParaSireRvie", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtPeriodo", periodo.ToDateTime(TimeOnly.MinValue));
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>(idTipoMensaje, mensaje, default);
+            }
+
+            var documentos = new List<DocumentoSireRvie>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                documentos.Add(new DocumentoSireRvie(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("EmpresaRuc")),
+                    lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("Serie")),
+                    lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                    lector.GetString(lector.GetOrdinal("ClienteTipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("ClienteNumeroDocumento")),
+                    lector.GetString(lector.GetOrdinal("ClienteNombre")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalExportacion")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalGravado")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalExonerado")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalInafecto")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIsc")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalOtrosTributos")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                    LeerNullableDecimal(lector, "TipoCambio"),
+                    LeerNullableDateOnly(lector, "FechaEmisionDocModificado"),
+                    LeerNullableString(lector, "TipoDocumentoRelacionadoCodigo"),
+                    LeerNullableString(lector, "SerieRelacionada"),
+                    LeerNullableInt(lector, "CorrelativoRelacionado")));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>.DeExito(mensaje, documentos);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> ActualizarEstadoSunatAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken)
@@ -865,6 +925,24 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
+    }
+
+    private static decimal? LeerNullableDecimal(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : lector.GetDecimal(ordinal);
+    }
+
+    private static int? LeerNullableInt(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : lector.GetInt32(ordinal);
+    }
+
+    private static DateOnly? LeerNullableDateOnly(SqlDataReader lector, string columna)
+    {
+        var ordinal = lector.GetOrdinal(columna);
+        return lector.IsDBNull(ordinal) ? null : DateOnly.FromDateTime(lector.GetDateTime(ordinal));
     }
 
     private static DateTime? LeerNullableDateTime(SqlDataReader lector, string columna)
