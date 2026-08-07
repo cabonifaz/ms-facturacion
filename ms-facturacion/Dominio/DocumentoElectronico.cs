@@ -16,6 +16,11 @@ public sealed class DocumentoElectronico
     public required DateOnly FechaEmision { get; init; }
     public required TimeOnly HoraEmision { get; init; }
     public required string MonedaCodigo { get; init; }
+
+    /// cac:PaymentExchangeRate/cbc:CalculationRate en el XML UBL — solo aplica cuando MonedaCodigo no es
+    /// PEN y el documento está ligado a una detracción/percepción/retención (Anexo N.° 7 SUNAT).
+    public decimal? TipoCambio { get; init; }
+
     public required string TipoOperacionCodigo { get; init; }
 
     /// No es una columna persistida — SP_DocumentoElectronico_Obtener la resuelve contra

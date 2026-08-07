@@ -84,11 +84,14 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         var anchoRecuadro = XUnit.FromMillimeter(65).Point;
         var xRecuadro = margen + anchoUtil - anchoRecuadro;
 
-        gfx.DrawString(empresa.RazonSocial, fuenteTitulo, XBrushes.Black, new XPoint(margen, y + 10));
-        gfx.DrawString(empresa.Direccion, fuenteTexto, XBrushes.Black,
-            new XRect(margen, y + 16, anchoUtil - anchoRecuadro - 10, 12), XStringFormats.TopLeft);
-        gfx.DrawString(ciudadEmpresa, fuenteTexto, XBrushes.Black,
-            new XRect(margen, y + 25, anchoUtil - anchoRecuadro - 10, 12), XStringFormats.TopLeft);
+        var anchoCabeceraIzquierda = anchoUtil - anchoRecuadro - 10;
+        var yCabeceraIzquierda = y + 6;
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTitulo, empresa.RazonSocial, anchoCabeceraIzquierda),
+            fuenteTitulo, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 14);
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, empresa.Direccion, anchoCabeceraIzquierda),
+            fuenteTexto, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 9);
+        yCabeceraIzquierda = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, ciudadEmpresa, anchoCabeceraIzquierda),
+            fuenteTexto, margen, anchoCabeceraIzquierda, yCabeceraIzquierda, 9);
 
         var altoRecuadro = XUnit.FromMillimeter(22).Point;
         gfx.DrawRectangle(XPens.Black, xRecuadro, y, anchoRecuadro, altoRecuadro);
@@ -99,7 +102,7 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         gfx.DrawString($"{cabecera.Serie}-{cabecera.Correlativo}", fuenteSubtitulo, XBrushes.Black,
             new XRect(xRecuadro, y + 34, anchoRecuadro, 16), XStringFormats.TopCenter);
 
-        y += Math.Max(altoRecuadro + 20, 55);
+        y += Math.Max(Math.Max(altoRecuadro + 20, 55), yCabeceraIzquierda - y + 10);
 
         // ===== Datos del comprobante: etiqueta : valor, alineado por columna =====
         gfx.DrawLine(XPens.Black, margen, y, margen + anchoUtil, y);
@@ -109,36 +112,35 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         // DrawString(..., XPoint) (que ancla por baseline, no por el techo del texto) hacía que el valor
         // apareciera ~9pt más abajo que su propia etiqueta, calzando visualmente con la fila siguiente.
         const double anchoEtiqueta = 130;
-        void DibujarCampo(string etiqueta, string valor)
+        double DibujarCampo(string etiqueta, string valor)
         {
+            var anchoValor = anchoUtil - anchoEtiqueta - 8;
             gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
             gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
-            gfx.DrawString(valor, fuenteTextoNegrita, XBrushes.Black,
-                new XRect(margen + anchoEtiqueta + 8, y, anchoUtil - anchoEtiqueta - 8, 22), XStringFormats.TopLeft);
+            var lineasValor = EnvolverTexto(gfx, fuenteTextoNegrita, valor, anchoValor);
+            return DibujarLineas(gfx, lineasValor, fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, y, 12);
         }
 
         // Dirección y distrito-provincia-departamento van en líneas separadas (no concatenadas en un solo
         // valor) para que calcen con la representación impresa de referencia de SUNAT.
-        void DibujarCampoDosLineas(string etiqueta, string valorLinea1, string valorLinea2)
+        double DibujarCampoDosLineas(string etiqueta, string valorLinea1, string valorLinea2)
         {
+            var anchoValor = anchoUtil - anchoEtiqueta - 8;
             gfx.DrawString(etiqueta, fuenteTexto, XBrushes.Black, new XRect(margen, y, anchoEtiqueta - 4, 12), XStringFormats.TopLeft);
             gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
-            gfx.DrawString(valorLinea1, fuenteTextoNegrita, XBrushes.Black,
-                new XRect(margen + anchoEtiqueta + 8, y, anchoUtil - anchoEtiqueta - 8, 12), XStringFormats.TopLeft);
-            gfx.DrawString(valorLinea2, fuenteTextoNegrita, XBrushes.Black,
-                new XRect(margen + anchoEtiqueta + 8, y + 11, anchoUtil - anchoEtiqueta - 8, 12), XStringFormats.TopLeft);
+            var yValor = y;
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea1, anchoValor),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, yValor, 11);
+            yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, valorLinea2, anchoValor),
+                fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValor, yValor, 11);
+            return yValor;
         }
 
-        DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
-        y += 12;
-        DibujarCampo("Señor(es)", cabecera.ClienteNombre);
-        y += 12;
-        DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa);
-        y += 24;
-        DibujarCampo("Tipo de Moneda", nombreMoneda);
-        y += 12;
-        DibujarCampo("Observación", cabecera.NumeroReferencia ?? "");
-        y += 18;
+        y = DibujarCampo("Fecha de Emisión", cabecera.FechaEmision.ToString("dd/MM/yyyy"));
+        y = DibujarCampo("Señor(es)", cabecera.ClienteNombre);
+        y = DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa) + 12;
+        y = DibujarCampo("Tipo de Moneda", nombreMoneda);
+        y = DibujarCampo("Observación", cabecera.NumeroReferencia ?? "") + 6;
 
         // ===== Tabla de líneas =====
         double[] anchosColumna = [45, 75, anchoUtil - 45 - 75 - 70 - 60, 70, 60];
@@ -211,7 +213,8 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
 
         var ySon = y + altoCajaGratuitas + 14;
         var montoLetras = NumeroALetrasConvertidor.Convertir(cabecera.TotalImporte, cabecera.MonedaCodigo);
-        gfx.DrawString(montoLetras, fuenteTextoNegrita, XBrushes.Black, new XRect(margen, ySon, anchoGratuitas, 30), XStringFormats.TopLeft);
+        var yFinSon = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, montoLetras, anchoGratuitas),
+            fuenteTextoNegrita, margen, anchoGratuitas, ySon, 11);
 
         // Totales (derecha): valor de venta ya viene neto de descuento por línea (ValorLinea), Descuentos
         // acá es solo informativo (el monto ya está reflejado en TotalGravado/Exonerado/Inafecto/Gratuito).
@@ -253,7 +256,23 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
             yTotales += altoFilaTotal;
         }
 
-        y = Math.Max(ySon + 40, yTotales + 15);
+        y = Math.Max(yFinSon + 10, yTotales + 15);
+
+        // ===== Campos extra (pares libres etiqueta/valor cargados por el usuario, sin relación con SUNAT) =====
+        if (documento.CamposExtra.Count > 0)
+        {
+            foreach (var campoExtra in documento.CamposExtra)
+            {
+                var anchoValorCampoExtra = anchoUtil - anchoEtiqueta - 8;
+                gfx.DrawString(":", fuenteTexto, XBrushes.Black, new XRect(margen + anchoEtiqueta, y, 8, 12), XStringFormats.TopLeft);
+                var yEtiqueta = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTexto, campoExtra.Etiqueta, anchoEtiqueta - 4),
+                    fuenteTexto, margen, anchoEtiqueta - 4, y, 12);
+                var yValor = DibujarLineas(gfx, EnvolverTexto(gfx, fuenteTextoNegrita, campoExtra.Valor, anchoValorCampoExtra),
+                    fuenteTextoNegrita, margen + anchoEtiqueta + 8, anchoValorCampoExtra, y, 12);
+                y = Math.Max(yEtiqueta, yValor);
+            }
+            y += 6;
+        }
 
         // ===== QR (Anexo C, RS 113-2018/SUNAT) =====
         // RUC|TipoDoc|Serie|Correlativo|IGV|Total|FechaEmision|TipoDocAdq|NumDocAdq|Hash

@@ -16,7 +16,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
     {
@@ -34,6 +34,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.Add("@tmHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
             comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
@@ -119,6 +120,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 FechaEmision = DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                 HoraEmision = TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
                 MonedaCodigo = lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                TipoCambio = lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
                 TipoOperacionCodigo = lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
                 FormaPagoCodigo = lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                 EmpresaRuc = lector.GetString(lector.GetOrdinal("EmpresaRuc")),
@@ -204,7 +206,17 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 cuotas.Add(LeerCuota(lector));
             }
 
-            var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas);
+            // Result set 6: campos extra
+            await lector.NextResultAsync(cancellationToken);
+            var camposExtra = new List<CampoExtraEntrada>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                camposExtra.Add(new CampoExtraEntrada(
+                    lector.GetString(lector.GetOrdinal("Etiqueta")),
+                    lector.GetString(lector.GetOrdinal("Valor"))));
+            }
+
+            var detalle = new DocumentoElectronicoDetalle(cabecera, lineas, referencia, cuotas, camposExtra);
             return ResultadoOperacion<DocumentoElectronicoDetalle>.DeExito(mensaje, detalle);
         }
         catch (Exception ex)
@@ -277,6 +289,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                 TimeOnly.FromTimeSpan(lector.GetTimeSpan(lector.GetOrdinal("HoraEmision"))),
                 lector.GetString(lector.GetOrdinal("MonedaCodigo")),
+                lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
                 lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
                 lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
                 lector.GetString(lector.GetOrdinal("EmpresaRuc")),
@@ -560,7 +573,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, int idTipoOperacionMaestro,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         CancellationToken cancellationToken)
     {
@@ -575,6 +588,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);

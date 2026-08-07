@@ -12,14 +12,14 @@ public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoR
     public Task<ResultadoOperacion<DocumentoElectronicoCreado>> EjecutarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro,
-        int idMonedaMaestro, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, CancellationToken cancellationToken)
     {
         var ahora = DateTime.Now;
         return repositorio.InsertarAsync(
             usuarioEjecutor, idInquilino, idEmpresa, idExterno, numeroReferencia, idTipoDocumentoMaestro,
-            DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), idMonedaMaestro, idTipoOperacionMaestro, idFormaPago, cliente,
+            DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), idMonedaMaestro, tipoCambio, idTipoOperacionMaestro, idFormaPago, cliente,
             documentoAfectado, lineas, cuotas, cancellationToken);
     }
 }

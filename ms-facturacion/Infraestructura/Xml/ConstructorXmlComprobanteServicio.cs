@@ -100,7 +100,21 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
             ConstruirCliente(cabecera),
-            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda),
+            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+
+        // cac:PaymentExchangeRate — solo cuando el documento trae TipoCambio (moneda extranjera ligada a
+        // detracción/percepción/retención, Anexo N.° 7 SUNAT). Target siempre PEN: es el único caso en que
+        // este tipo de cambio aplica.
+        if (cabecera.TipoCambio.HasValue)
+        {
+            raiz.Add(new XElement(Cac + "PaymentExchangeRate",
+                new XElement(Cbc + "SourceCurrencyCode", moneda),
+                new XElement(Cbc + "TargetCurrencyCode", "PEN"),
+                new XElement(Cbc + "CalculationRate", cabecera.TipoCambio.Value.ToString("0.000", CultureInfo.InvariantCulture)),
+                new XElement(Cbc + "Date", cabecera.FechaEmision.ToString("yyyy-MM-dd"))));
+        }
+
+        raiz.Add(
             ConstruirTaxTotal(documento.Lineas, moneda),
             ConstruirTotalMonetario(tipo.ElementoTotalMonetario, cabecera, moneda));
 
