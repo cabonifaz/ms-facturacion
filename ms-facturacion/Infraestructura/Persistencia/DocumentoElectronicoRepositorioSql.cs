@@ -45,7 +45,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intClientePaisCodigo", cliente.PaisCodigo);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchTipoReferenciaCodigo", (object?)documentoAfectado?.TipoReferenciaCodigo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchMotivoCodigo", (object?)documentoAfectado?.MotivoCodigo ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchMotivoDescripcion", (object?)documentoAfectado?.MotivoDescripcion ?? DBNull.Value);
 
@@ -198,7 +197,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
                     lector.GetString(lector.GetOrdinal("SerieRelacionada")),
                     lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
-                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
             }
@@ -401,7 +399,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
                     lector.GetString(lector.GetOrdinal("SerieRelacionada")),
                     lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
-                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
             }

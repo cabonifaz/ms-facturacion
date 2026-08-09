@@ -28,7 +28,7 @@ public sealed record LineaDocumentoElectronicoPublica(
 
 public sealed record ReferenciaDocumentoElectronicaPublica(
     string TipoDocumentoRelacionadoCodigo, string SerieRelacionada, int CorrelativoRelacionado,
-    string TipoReferenciaCodigo, string MotivoCodigo, string MotivoDescripcion);
+    string MotivoCodigo, string MotivoDescripcion);
 
 public sealed record CuotaDocumentoElectronicaPublica(
     int NumeroCuota, DateOnly FechaVencimiento, decimal Monto, string EstadoCuotaCodigo, DateTime? FechaPago);
