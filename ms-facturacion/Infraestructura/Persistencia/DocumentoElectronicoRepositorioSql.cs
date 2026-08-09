@@ -45,8 +45,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intClientePaisCodigo", cliente.PaisCodigo);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchMotivoCodigo", (object?)documentoAfectado?.MotivoCodigo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchMotivoDescripcion", (object?)documentoAfectado?.MotivoDescripcion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdMotivoMaestro", (object?)documentoAfectado?.IdMotivoMaestro ?? DBNull.Value);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO";

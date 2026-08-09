@@ -9,7 +9,7 @@ public sealed record FormaPagoPeticion(int IdFormaPago, IReadOnlyList<CuotaPetic
 public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
 public sealed record ClientePeticion(
     int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
-public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, string MotivoCodigo, string MotivoDescripcion);
+public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
 
 public sealed record ItemPeticion(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
@@ -82,8 +82,7 @@ public sealed class DocumentosElectronicosController(
         var documentoAfectado = peticion.DocumentoAfectado is null
             ? null
             : new DocumentoAfectadoEntrada(
-                peticion.DocumentoAfectado.IdDocumentoElectronicoRelacionado,
-                peticion.DocumentoAfectado.MotivoCodigo, peticion.DocumentoAfectado.MotivoDescripcion);
+                peticion.DocumentoAfectado.IdDocumentoElectronicoRelacionado, peticion.DocumentoAfectado.IdMotivoMaestro);
 
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
