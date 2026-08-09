@@ -258,13 +258,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
-    public async Task<ResultadoOperacion<ClienteDatosEntrada>> ObtenerClienteAsync(
+    public async Task<ResultadoOperacion<DatosParaNota>> ObtenerParaNotaAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
         try
         {
             await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerCliente", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerParaNota", conexion) { CommandType = CommandType.StoredProcedure };
 
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
@@ -275,7 +275,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
             if (idTipoMensaje != TipoMensaje.Exito)
             {
-                return new ResultadoOperacion<ClienteDatosEntrada>(idTipoMensaje, mensaje, default);
+                return new ResultadoOperacion<DatosParaNota>(idTipoMensaje, mensaje, default);
             }
 
             await lector.NextResultAsync(cancellationToken);
@@ -289,11 +289,20 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 LeerNullableString(lector, "Direccion"),
                 lector.GetInt32(lector.GetOrdinal("PaisCodigo")));
 
-            return ResultadoOperacion<ClienteDatosEntrada>.DeExito(mensaje, cliente);
+            await lector.NextResultAsync(cancellationToken);
+            var productos = new List<ProductoDocumentoResumen>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                productos.Add(new ProductoDocumentoResumen(
+                    lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+                    lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
+            }
+
+            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, productos));
         }
         catch (Exception ex)
         {
-            return ResultadoOperacion<ClienteDatosEntrada>.DeErrorSistema(ex.Message);
+            return ResultadoOperacion<DatosParaNota>.DeErrorSistema(ex.Message);
         }
     }
 

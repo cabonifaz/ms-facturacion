@@ -28,9 +28,9 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
         string tokenPublico, CancellationToken cancellationToken);
 
-    /// Snapshot de cliente de un documento ya emitido (sin resolver los Num1 contra TABLA_MAESTRA) — para
-    /// prellenar el receptor de una Nota de Crédito/Débito con el mismo cliente del documento afectado.
-    Task<ResultadoOperacion<ClienteDatosEntrada>> ObtenerClienteAsync(
+    /// Cliente + líneas de un documento ya emitido, sin resolver los Num1 contra TABLA_MAESTRA — para
+    /// prellenar/listar ambos al armar una Nota de Crédito/Débito contra ese documento.
+    Task<ResultadoOperacion<DatosParaNota>> ObtenerParaNotaAsync(
         int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(

@@ -66,7 +66,7 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
-    ObtenerClienteDocumentoElectronicoCasoDeUso obtenerClienteCasoDeUso,
+    ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -198,13 +198,13 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
-    // Snapshot de cliente de un documento ya emitido, sin resolver — para prellenar el receptor de una
-    // Nota de Crédito/Débito con el mismo cliente del documento afectado (ver documentoAfectado).
-    [HttpGet("{idDocumentoElectronico:int}/cliente")]
-    public async Task<IActionResult> ObtenerCliente(
+    // Cliente + listado de productos de un documento ya emitido, sin resolver — para prellenar el receptor
+    // y listar los productos del documento afectado al armar una Nota de Crédito/Débito.
+    [HttpGet("{idDocumentoElectronico:int}/para-nota")]
+    public async Task<IActionResult> ObtenerParaNota(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
-        var resultado = await obtenerClienteCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        var resultado = await obtenerParaNotaCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
