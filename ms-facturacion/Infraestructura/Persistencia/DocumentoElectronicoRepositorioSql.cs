@@ -261,6 +261,45 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<ClienteDatosEntrada>> ObtenerClienteAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerCliente", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<ClienteDatosEntrada>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var cliente = new ClienteDatosEntrada(
+                lector.GetInt32(lector.GetOrdinal("IdTipoDocumentoSunat")),
+                lector.GetString(lector.GetOrdinal("NumeroDocumento")),
+                LeerNullableString(lector, "Nombre"),
+                LeerNullableString(lector, "Correo"),
+                LeerNullableString(lector, "Direccion"),
+                lector.GetInt32(lector.GetOrdinal("PaisCodigo")));
+
+            return ResultadoOperacion<ClienteDatosEntrada>.DeExito(mensaje, cliente);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<ClienteDatosEntrada>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
         string tokenPublico, CancellationToken cancellationToken)
     {

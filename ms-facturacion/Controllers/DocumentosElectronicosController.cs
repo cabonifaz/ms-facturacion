@@ -66,6 +66,7 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
+    ObtenerClienteDocumentoElectronicoCasoDeUso obtenerClienteCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -194,6 +195,16 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
         var resultado = await obtenerTokenVerificacionCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Snapshot de cliente de un documento ya emitido, sin resolver — para prellenar el receptor de una
+    // Nota de Crédito/Débito con el mismo cliente del documento afectado (ver documentoAfectado).
+    [HttpGet("{idDocumentoElectronico:int}/cliente")]
+    public async Task<IActionResult> ObtenerCliente(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerClienteCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
