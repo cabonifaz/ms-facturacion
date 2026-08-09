@@ -60,9 +60,12 @@ public interface IDocumentoElectronicoRepositorio
     /// "Guardar cambios" en lote: reemplaza el diseño anterior de 6 endpoints granulares (Agregar/Actualizar/
     /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
+    /// idMotivoMaestro: solo aplica a Nota de Crédito/Débito (null en Factura/Boleta) — a diferencia de
+    /// documentoAfectado/idDocumentoElectronicoRelacionado (fijo desde Insertar), el motivo sí es editable
+    /// mientras el documento siga PendienteEnvio.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 

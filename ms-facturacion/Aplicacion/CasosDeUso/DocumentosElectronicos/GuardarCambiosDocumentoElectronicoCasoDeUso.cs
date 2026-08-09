@@ -8,10 +8,10 @@ public sealed class GuardarCambiosDocumentoElectronicoCasoDeUso(IDocumentoElectr
 {
     public Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> EjecutarAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken) =>
         repositorio.GuardarCambiosAsync(
             usuarioEjecutor, idInquilino, idDocumentoElectronico, idFormaPago, numeroReferencia,
-            idMonedaMaestro, tipoCambio, idTipoOperacionMaestro, lineas, cuotas, camposExtra, cancellationToken);
+            idMonedaMaestro, tipoCambio, idTipoOperacionMaestro, idMotivoMaestro, lineas, cuotas, camposExtra, cancellationToken);
 }
