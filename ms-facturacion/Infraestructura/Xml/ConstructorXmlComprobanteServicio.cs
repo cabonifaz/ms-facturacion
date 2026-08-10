@@ -105,8 +105,16 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         raiz.Add(
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
-            ConstruirCliente(cabecera),
-            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+            ConstruirCliente(cabecera));
+
+        // cac:PaymentTerms (FormaPago) no existe en el contenido documentado de Nota de Crédito/Débito
+        // (Guía de Elaboración XML UBL 2.1 — tabla de contenido, pág. 4: PaymentTerms no aparece en toda la
+        // guía) — es un concepto propio de Factura/Boleta. Emitirlo en 07/08 causaba fault SUNAT 3246
+        // ("El tipo de transaccion... no cumple con el formato esperado", nodo PaymentTerms/PaymentMeansID).
+        if (!esNota)
+        {
+            raiz.Add(ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+        }
 
         // cac:PaymentExchangeRate — solo cuando el documento trae TipoCambio (moneda extranjera ligada a
         // detracción/percepción/retención, Anexo N.° 7 SUNAT). Target siempre PEN: es el único caso en que
