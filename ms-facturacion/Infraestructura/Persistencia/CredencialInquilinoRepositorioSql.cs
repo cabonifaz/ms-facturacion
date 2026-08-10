@@ -6,7 +6,8 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Infraestructura.Persistencia;
 
-public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuracion) : ICredencialInquilinoRepositorio
+public sealed class CredencialInquilinoRepositorioSql(
+    IConfiguration configuracion, ILogger<CredencialInquilinoRepositorioSql> logger) : ICredencialInquilinoRepositorio
 {
     private const string MensajeSinCabecera = "El procedimiento almacenado no devolvió el resultado esperado.";
 
@@ -98,6 +99,15 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
     public async Task<ResultadoOperacion<CredencialInquilinoCifrada>> ObtenerPorTipoAsync(
         int idInquilino, int idEmpresa, string tipoCredencialCodigo, CancellationToken cancellationToken)
     {
+        // Log de los parámetros exactos que le llegan a SP_CredencialInquilino_ObtenerPorTipo — el WHERE de
+        // ese SP exige coincidencia exacta de IdInquilino + IdEmpresa + TipoCredencialCodigo + Activo=1 +
+        // SoftDelete=0; si "no encuentra" la credencial pese a existir una fila, lo más probable es que uno
+        // de estos tres valores (sobre todo TipoCredencialCodigo, texto libre) no coincida exactamente con
+        // lo que hay en CREDENCIALES_INQUILINO — esto lo deja explícito en vez de tener que asumirlo.
+        logger.LogInformation(
+            "CredencialInquilino.ObtenerPorTipo — buscando. idInquilino={IdInquilino}, idEmpresa={IdEmpresa}, tipoCredencialCodigo='{TipoCredencialCodigo}' (longitud={Longitud}).",
+            idInquilino, idEmpresa, tipoCredencialCodigo, tipoCredencialCodigo.Length);
+
         try
         {
             await using var conexion = new SqlConnection(CadenaConexion);
@@ -113,6 +123,9 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
             var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
             if (idTipoMensaje != TipoMensaje.Exito)
             {
+                logger.LogWarning(
+                    "CredencialInquilino.ObtenerPorTipo — el SP no encontró la credencial. idInquilino={IdInquilino}, idEmpresa={IdEmpresa}, tipoCredencialCodigo='{TipoCredencialCodigo}': {Mensaje}",
+                    idInquilino, idEmpresa, tipoCredencialCodigo, mensaje);
                 return new ResultadoOperacion<CredencialInquilinoCifrada>(idTipoMensaje, mensaje, default);
             }
 
@@ -126,10 +139,17 @@ public sealed class CredencialInquilinoRepositorioSql(IConfiguration configuraci
                 (byte[])lector["Nonce"],
                 (byte[])lector["Tag"]);
 
+            logger.LogInformation(
+                "CredencialInquilino.ObtenerPorTipo — encontrada. idCredencialInquilino={IdCredencialInquilino}, usuario='{Usuario}', valorCifradoBytes={ValorCifradoBytes}.",
+                credencial.IdCredencialInquilino, credencial.Usuario, credencial.ValorCifrado.Length);
+
             return ResultadoOperacion<CredencialInquilinoCifrada>.DeExito(mensaje, credencial);
         }
         catch (Exception ex)
         {
+            logger.LogError(
+                ex, "CredencialInquilino.ObtenerPorTipo — excepción no controlada. idInquilino={IdInquilino}, idEmpresa={IdEmpresa}, tipoCredencialCodigo='{TipoCredencialCodigo}'.",
+                idInquilino, idEmpresa, tipoCredencialCodigo);
             return ResultadoOperacion<CredencialInquilinoCifrada>.DeErrorSistema(ex.Message);
         }
     }
