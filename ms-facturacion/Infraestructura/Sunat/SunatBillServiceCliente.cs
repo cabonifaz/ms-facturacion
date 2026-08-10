@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -25,6 +26,20 @@ public sealed class SunatBillServiceCliente(
         string url, string usuarioSolCompleto, string claveSol, string nombreArchivoZip, byte[] zipBytes,
         CancellationToken cancellationToken)
     {
+        // Métrica de costo real del envío: tiempo de reloj (dominado por la red/SUNAT, no por CPU local) y
+        // bytes asignados en el hilo actual (armado del envelope Base64 + parseo de la respuesta), para poder
+        // dimensionar la instancia sin adivinar. Se loguea siempre (no solo en Development) porque es dato de
+        // capacidad, no contenido sensible.
+        var cronometro = Stopwatch.StartNew();
+        var bytesAsignadosAntes = GC.GetAllocatedBytesForCurrentThread();
+        // CPU/RAM son a nivel de proceso (Process.GetCurrentProcess()), no del hilo — a diferencia de
+        // GC.GetAllocatedBytesForCurrentThread arriba, si el proceso está atendiendo otras requests en
+        // paralelo esos deltas incluyen ese ruido. Igual sirve como señal real de costo, ya que sendBill
+        // corre secuencial dentro de un mismo envío (no hay paralelismo interno a esta llamada).
+        var procesoActual = Process.GetCurrentProcess();
+        var cpuAntes = procesoActual.TotalProcessorTime;
+        var ramAntesKb = procesoActual.WorkingSet64 / 1024;
+
         try
         {
             if (entorno.IsDevelopment())
@@ -58,8 +73,10 @@ public sealed class SunatBillServiceCliente(
             };
             solicitud.Headers.TryAddWithoutValidation("SOAPAction", "\"\"");
 
+            var cronometroHttp = Stopwatch.StartNew();
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
+            cronometroHttp.Stop();
 
             if (entorno.IsDevelopment())
             {
@@ -75,10 +92,30 @@ public sealed class SunatBillServiceCliente(
                     faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.");
             }
 
-            return InterpretarRespuesta(cuerpoRespuesta);
+            var resultado = InterpretarRespuesta(cuerpoRespuesta);
+
+            var cpuMs = (procesoActual.TotalProcessorTime - cpuAntes).TotalMilliseconds;
+            var ramDespuesKb = procesoActual.WorkingSet64 / 1024;
+
+            logger.LogInformation(
+                "sendBill — costo: {ElapsedMs} ms totales ({HttpMs} ms en la llamada HTTP a SUNAT), " +
+                "{ZipBytes} bytes de ZIP, {EnvelopeBytes} bytes de envelope SOAP, {ResponseBytes} bytes de respuesta, " +
+                "{AllocatedKb} KB asignados en este hilo | CPU proceso: {CpuMs} ms | RAM proceso (working set): " +
+                "{RamAntesMb} MB -> {RamDespuesMb} MB ({RamDeltaMb:+0;-0;0} MB).",
+                cronometro.ElapsedMilliseconds, cronometroHttp.ElapsedMilliseconds,
+                zipBytes.Length, xmlSobreEnvio.Length, cuerpoRespuesta.Length,
+                (GC.GetAllocatedBytesForCurrentThread() - bytesAsignadosAntes) / 1024,
+                cpuMs, ramAntesKb / 1024, ramDespuesKb / 1024, (ramDespuesKb - ramAntesKb) / 1024);
+
+            return resultado;
         }
         catch (Exception ex)
         {
+            var cpuMs = (procesoActual.TotalProcessorTime - cpuAntes).TotalMilliseconds;
+            logger.LogWarning(
+                "sendBill — falló a los {ElapsedMs} ms ({AllocatedKb} KB asignados en este hilo, {CpuMs} ms CPU proceso): {Mensaje}",
+                cronometro.ElapsedMilliseconds, (GC.GetAllocatedBytesForCurrentThread() - bytesAsignadosAntes) / 1024, cpuMs, ex.Message);
+
             return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(ex.Message);
         }
     }
