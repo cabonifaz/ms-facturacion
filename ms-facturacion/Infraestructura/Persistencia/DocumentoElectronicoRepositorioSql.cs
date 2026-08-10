@@ -529,6 +529,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 items.Add(new FacturaResumenPedidoFactura(
                     lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                     lector.GetString(lector.GetOrdinal("NumeroFactura")),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoTexto")),
                     lector.GetString(lector.GetOrdinal("ClienteNombre")),
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                     lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
