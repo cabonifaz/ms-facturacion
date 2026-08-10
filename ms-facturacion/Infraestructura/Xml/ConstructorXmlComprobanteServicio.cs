@@ -64,17 +64,13 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             new XElement(Cbc + "IssueDate", cabecera.FechaEmision.ToString("yyyy-MM-dd")),
             new XElement(Cbc + "IssueTime", cabecera.HoraEmision.ToString("HH:mm:ss")));
 
-        if (esNota)
+        if (esNota && documento.Referencia is null)
         {
-            if (documento.Referencia is null)
-            {
-                throw new InvalidOperationException(
-                    "El documento es una nota de crédito/débito pero no tiene REFERENCIAS_DOCUMENTO_ELECTRONICO asociada.");
-            }
-
-            raiz.Add(ConstruirDiscrepancyResponse(documento.Referencia));
+            throw new InvalidOperationException(
+                "El documento es una nota de crédito/débito pero no tiene REFERENCIAS_DOCUMENTO_ELECTRONICO asociada.");
         }
-        else
+
+        if (!esNota)
         {
             raiz.Add(
                 new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo),
@@ -83,7 +79,17 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                 new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "1000"), cabecera.TipoOperacionCodigo));
         }
 
+        // cbc:DocumentCurrencyCode debe ir ANTES de cac:DiscrepancyResponse (orden exigido por el XSD
+        // CreditNoteType/DebitNoteType de UBL 2.1) — invertido antes, lo que causaba fault
+        // "found DocumentCurrencyCode, but next item should be AccountingSupplierParty" en SUNAT: al ser
+        // ambos opcionales, el validador saltaba DocumentCurrencyCode en su posición real, calzaba
+        // DiscrepancyResponse más adelante, y luego no lograba ubicar el DocumentCurrencyCode sobrante.
         raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));
+
+        if (esNota)
+        {
+            raiz.Add(ConstruirDiscrepancyResponse(documento.Referencia!));
+        }
 
         // cac:OrderReference — opcional (0..1 en la guía SUNAT), string plano (an..20) sin validación SUNAT.
         if (!string.IsNullOrEmpty(cabecera.NumeroReferencia))
