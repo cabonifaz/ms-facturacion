@@ -49,6 +49,9 @@ public sealed class ProveedorCertificadoServicio(
 
         if (cache.TryGetValue(claveCache, out X509Certificate2? x509Cacheado) && x509Cacheado is not null)
         {
+            logger.LogInformation(
+                "ProveedorCertificado — usando certificado en caché. claveCache={ClaveCache}, sujeto={Sujeto}, huellaDigital={HuellaDigital}, validoHasta={ValidoHasta:o}.",
+                claveCache, x509Cacheado.Subject, x509Cacheado.Thumbprint, x509Cacheado.NotAfter);
             return ResultadoOperacion<X509Certificate2>.DeExito("Certificado cargado correctamente (caché).", x509Cacheado);
         }
 
@@ -60,12 +63,23 @@ public sealed class ProveedorCertificadoServicio(
                 return new ResultadoOperacion<X509Certificate2>(certificado.IdTipoMensaje, certificado.Mensaje, default);
             }
 
+            logger.LogInformation(
+                "ProveedorCertificado — descargando de S3. bucket={Bucket}, clave={Clave}.",
+                BucketName, certificado.Datos.RutaAlmacenamiento);
+
             var pfxBytes = await DescargarDeS3Async(certificado.Datos.RutaAlmacenamiento, cancellationToken);
+
+            logger.LogInformation(
+                "ProveedorCertificado — resultado de la descarga S3. clave={Clave}, encontrado={Encontrado}, bytes={Bytes}.",
+                certificado.Datos.RutaAlmacenamiento, pfxBytes is not null, pfxBytes?.Length ?? 0);
 
             X509Certificate2 x509;
 
             if (entorno.IsDevelopment() && pfxBytes is null)
             {
+                logger.LogWarning(
+                    "ProveedorCertificado — no se encontró el .pfx en S3 (clave={Clave}), generando certificado autofirmado de desarrollo (EnvironmentName={EnvironmentName}).",
+                    certificado.Datos.RutaAlmacenamiento, entorno.EnvironmentName);
                 x509 = GenerarCertificadoDev();
             }
             else
@@ -79,10 +93,17 @@ public sealed class ProveedorCertificadoServicio(
                         $"No se encontró el certificado en S3: {certificado.Datos.RutaAlmacenamiento}.");
                 }
 
+                logger.LogInformation(
+                    "ProveedorCertificado — buscando credencial {TipoCredencial} (idInquilino={IdInquilino}, idEmpresa={IdEmpresa}).",
+                    TipoCredencialClaveCertificado, idInquilino, idEmpresa);
+
                 var credencial = await credencialRepositorio.ObtenerPorTipoAsync(
                     idInquilino, idEmpresa, TipoCredencialClaveCertificado, cancellationToken);
                 if (credencial.IdTipoMensaje != TipoMensaje.Exito || credencial.Datos is null)
                 {
+                    logger.LogWarning(
+                        "ProveedorCertificado — no se encontró la credencial {TipoCredencial}: {Mensaje}",
+                        TipoCredencialClaveCertificado, credencial.Mensaje);
                     return new ResultadoOperacion<X509Certificate2>(credencial.IdTipoMensaje, credencial.Mensaje, default);
                 }
 
@@ -90,6 +111,7 @@ public sealed class ProveedorCertificadoServicio(
                     idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
                 if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
                 {
+                    logger.LogWarning("ProveedorCertificado — falló al descifrar la clave del certificado: {Mensaje}", clave.Mensaje);
                     return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);
                 }
 
@@ -111,6 +133,16 @@ public sealed class ProveedorCertificadoServicio(
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
                         $"No se pudo cargar el certificado: {ex.Message}");
                 }
+
+                // Confirma que el .pfx descargado de S3 (no uno de caché ni el autofirmado de dev) es
+                // realmente el que se usa a partir de acá — sujeto/huella digital identifican
+                // inequívocamente cuál certificado real cargó, y tieneClavePrivada confirma que
+                // GetRSAPrivateKey() (usado más adelante por FirmadorXmlServicio) va a poder acceder a
+                // ella, no solo que el objeto X509Certificate2 se construyó sin tirar excepción.
+                logger.LogInformation(
+                    "ProveedorCertificado — certificado cargado desde S3. sujeto={Sujeto}, huellaDigital={HuellaDigital}, " +
+                    "validoDesde={ValidoDesde:o}, validoHasta={ValidoHasta:o}, tieneClavePrivada={TieneClavePrivada}.",
+                    x509.Subject, x509.Thumbprint, x509.NotBefore, x509.NotAfter, x509.HasPrivateKey);
             }
 
             cache.Set(claveCache, x509, DuracionCache);
