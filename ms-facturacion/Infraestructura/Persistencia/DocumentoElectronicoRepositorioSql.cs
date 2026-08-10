@@ -16,7 +16,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
@@ -37,7 +37,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
             comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
-            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
             comando.Parameters.AddWithValue("@vchClienteNumeroDocumento", cliente.NumeroDocumento);
             comando.Parameters.AddWithValue("@vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
@@ -680,7 +680,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
@@ -693,7 +693,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
             comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);

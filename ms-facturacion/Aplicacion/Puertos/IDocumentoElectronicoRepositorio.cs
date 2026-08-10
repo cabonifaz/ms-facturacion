@@ -8,7 +8,7 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken);
@@ -64,7 +64,7 @@ public interface IDocumentoElectronicoRepositorio
     /// documentoAfectado/idDocumentoElectronicoRelacionado (fijo desde Insertar), el motivo sí es editable
     /// mientras el documento siga PendienteEnvio.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);

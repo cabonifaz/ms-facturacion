@@ -5,7 +5,7 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Controllers;
 
-public sealed record FormaPagoPeticion(int IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
+public sealed record FormaPagoPeticion(int? IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
 public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
 public sealed record ClientePeticion(
     int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
@@ -19,7 +19,7 @@ public sealed record ItemPeticion(
 public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
     int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
-    FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
+    FormaPagoPeticion? FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
     IReadOnlyList<ItemPeticion> Items, IReadOnlyList<CampoExtraPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoSunatPeticion(
@@ -41,7 +41,7 @@ public sealed record CuotaEdicionPeticion(
 public sealed record CampoExtraEdicionPeticion(string Texto, int IdCampoExtraDocumentoElectronico = 0);
 
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
+    int? IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
     IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
     IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null, int? IdMotivoMaestro = null);
 
@@ -90,7 +90,7 @@ public sealed class DocumentosElectronicosController(
                 item.Cantidad, item.ValorUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
-        var cuotas = (peticion.FormaPago.Cuotas ?? [])
+        var cuotas = (peticion.FormaPago?.Cuotas ?? [])
             .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
             .ToList();
 
@@ -101,7 +101,7 @@ public sealed class DocumentosElectronicosController(
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno, peticion.NumeroReferencia,
             peticion.IdTipoDocumentoMaestro,
-            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago?.IdFormaPago, cliente,
             documentoAfectado, lineas, cuotas, camposExtra, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
