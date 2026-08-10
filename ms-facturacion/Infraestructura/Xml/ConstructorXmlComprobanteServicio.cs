@@ -113,7 +113,9 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         // ("El tipo de transaccion... no cumple con el formato esperado", nodo PaymentTerms/PaymentMeansID).
         if (!esNota)
         {
-            raiz.Add(ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+            // FormaPagoCodigo solo es NULL en Nota de Crédito/Débito (ver SP_DocumentoElectronico_Obtener) —
+            // en esta rama (!esNota) siempre viene resuelto.
+            raiz.Add(ConstruirFormaPago(cabecera.FormaPagoCodigo!, documento.Cuotas, cabecera.TotalImporte, moneda));
         }
 
         // cac:PaymentExchangeRate — solo cuando el documento trae TipoCambio (moneda extranjera ligada a
