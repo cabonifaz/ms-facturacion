@@ -8,7 +8,8 @@ namespace ms_facturacion.Infraestructura.Almacenamiento;
 /// Mismo patrón de conexión que maximlian3_backend/SafetyReport.Handlers/S3UploadService.cs: IAmazonS3
 /// inyectado (credenciales estáticas + región resueltas una sola vez en Program.cs), nombre de bucket
 /// leído de configuración. El resto del sistema solo conoce IAlmacenamientoArchivosServicio.
-public sealed class AlmacenamientoArchivosS3Servicio(IAmazonS3 s3Cliente, IConfiguration configuracion) : IAlmacenamientoArchivosServicio
+public sealed class AlmacenamientoArchivosS3Servicio(
+    IAmazonS3 s3Cliente, IConfiguration configuracion, ILogger<AlmacenamientoArchivosS3Servicio> logger) : IAlmacenamientoArchivosServicio
 {
     private string BucketName => configuracion["AWS:BucketName"]
         ?? throw new InvalidOperationException("No se configuró 'AWS:BucketName'.");
@@ -26,7 +27,20 @@ public sealed class AlmacenamientoArchivosS3Servicio(IAmazonS3 s3Cliente, IConfi
             AutoCloseStream = false
         };
 
-        await s3Cliente.PutObjectAsync(solicitud, cancellationToken);
+        try
+        {
+            await s3Cliente.PutObjectAsync(solicitud, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Este método devuelve string, no ResultadoOperacion — no hay dónde envolver el error acá sin
+            // cambiar el contrato del puerto. Se loguea con el detalle real (credenciales AWS/permisos de
+            // bucket/red de salida bloqueada son la diferencia más probable entre el entorno de desarrollo y
+            // uno nuevo) y se re-lanza tal cual para que el catch general de EnviarDocumentoElectronicoASunatCasoDeUso
+            // lo convierta en una respuesta con envelope.
+            logger.LogError(ex, "AlmacenamientoS3 — falló PutObject. bucket={Bucket}, clave={Clave}.", BucketName, clave);
+            throw;
+        }
 
         return clave;
     }

@@ -105,6 +105,7 @@ builder.Services.AddScoped<GenerarTxtSireRvieCasoDeUso>();
 builder.Services.AddScoped<ObtenerUrlDescargaDocumentoCasoDeUso>();
 builder.Services.AddScoped<ObtenerUrlDescargaPorTokenCasoDeUso>();
 builder.Services.AddScoped<ObtenerTokenVerificacionDocumentoCasoDeUso>();
+builder.Services.AddScoped<ObtenerParaNotaCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();

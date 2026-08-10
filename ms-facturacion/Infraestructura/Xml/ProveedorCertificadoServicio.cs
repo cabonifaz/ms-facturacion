@@ -33,7 +33,8 @@ public sealed class ProveedorCertificadoServicio(
     IMemoryCache cache,
     IHostEnvironment entorno,
     IAmazonS3 s3Cliente,
-    IConfiguration configuracion) : IProveedorCertificadoServicio
+    IConfiguration configuracion,
+    ILogger<ProveedorCertificadoServicio> logger) : IProveedorCertificadoServicio
 {
     private const string TipoCredencialClaveCertificado = "ClaveCertificado";
     private static readonly TimeSpan DuracionCache = TimeSpan.FromHours(4);
@@ -51,49 +52,78 @@ public sealed class ProveedorCertificadoServicio(
             return ResultadoOperacion<X509Certificate2>.DeExito("Certificado cargado correctamente (caché).", x509Cacheado);
         }
 
-        var certificado = await certificadoRepositorio.ObtenerAsync(idInquilino, idCertificado, cancellationToken);
-        if (certificado.IdTipoMensaje != TipoMensaje.Exito || certificado.Datos is null)
+        try
         {
-            return new ResultadoOperacion<X509Certificate2>(certificado.IdTipoMensaje, certificado.Mensaje, default);
-        }
-
-        var pfxBytes = await DescargarDeS3Async(certificado.Datos.RutaAlmacenamiento, cancellationToken);
-
-        X509Certificate2 x509;
-
-        if (entorno.IsDevelopment() && pfxBytes is null)
-        {
-            x509 = GenerarCertificadoDev();
-        }
-        else
-        {
-            if (pfxBytes is null)
+            var certificado = await certificadoRepositorio.ObtenerAsync(idInquilino, idCertificado, cancellationToken);
+            if (certificado.IdTipoMensaje != TipoMensaje.Exito || certificado.Datos is null)
             {
-                return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
-                    $"No se encontró el certificado en S3: {certificado.Datos.RutaAlmacenamiento}.");
+                return new ResultadoOperacion<X509Certificate2>(certificado.IdTipoMensaje, certificado.Mensaje, default);
             }
 
-            var credencial = await credencialRepositorio.ObtenerPorTipoAsync(
-                idInquilino, idEmpresa, TipoCredencialClaveCertificado, cancellationToken);
-            if (credencial.IdTipoMensaje != TipoMensaje.Exito || credencial.Datos is null)
+            var pfxBytes = await DescargarDeS3Async(certificado.Datos.RutaAlmacenamiento, cancellationToken);
+
+            X509Certificate2 x509;
+
+            if (entorno.IsDevelopment() && pfxBytes is null)
             {
-                return new ResultadoOperacion<X509Certificate2>(credencial.IdTipoMensaje, credencial.Mensaje, default);
+                x509 = GenerarCertificadoDev();
+            }
+            else
+            {
+                if (pfxBytes is null)
+                {
+                    logger.LogWarning(
+                        "ProveedorCertificado — no se encontró el certificado en S3: bucket={Bucket}, clave={Clave}.",
+                        BucketName, certificado.Datos.RutaAlmacenamiento);
+                    return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
+                        $"No se encontró el certificado en S3: {certificado.Datos.RutaAlmacenamiento}.");
+                }
+
+                var credencial = await credencialRepositorio.ObtenerPorTipoAsync(
+                    idInquilino, idEmpresa, TipoCredencialClaveCertificado, cancellationToken);
+                if (credencial.IdTipoMensaje != TipoMensaje.Exito || credencial.Datos is null)
+                {
+                    return new ResultadoOperacion<X509Certificate2>(credencial.IdTipoMensaje, credencial.Mensaje, default);
+                }
+
+                var clave = await cifradoServicio.DescifrarAsync(
+                    idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
+                if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
+                {
+                    return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);
+                }
+
+                // Punto de falla frecuente al cambiar de entorno: EphemeralKeySet + el proveedor de
+                // criptografía difieren entre Windows (dev) y Linux (p.ej. Azure App Service Linux), y un
+                // .pfx corrupto/con clave incorrecta también revienta acá con CryptographicException — antes
+                // no había forma de distinguir estos casos del resto de la cadena sin loguear el tipo real
+                // de excepción.
+                try
+                {
+                    x509 = X509CertificateLoader.LoadPkcs12(
+                        pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
+                }
+                catch (CryptographicException ex)
+                {
+                    logger.LogError(
+                        ex, "ProveedorCertificado — falló al cargar el .pfx (idCertificado={IdCertificado}, clave S3={Clave}).",
+                        idCertificado, certificado.Datos.RutaAlmacenamiento);
+                    return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
+                        $"No se pudo cargar el certificado: {ex.Message}");
+                }
             }
 
-            var clave = await cifradoServicio.DescifrarAsync(
-                idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
-            if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
-            {
-                return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);
-            }
+            cache.Set(claveCache, x509, DuracionCache);
 
-            x509 = X509CertificateLoader.LoadPkcs12(
-                pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
+            return ResultadoOperacion<X509Certificate2>.DeExito("Certificado cargado correctamente.", x509);
         }
-
-        cache.Set(claveCache, x509, DuracionCache);
-
-        return ResultadoOperacion<X509Certificate2>.DeExito("Certificado cargado correctamente.", x509);
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex, "ProveedorCertificado — excepción no controlada (idInquilino={IdInquilino}, idEmpresa={IdEmpresa}, idCertificado={IdCertificado}).",
+                idInquilino, idEmpresa, idCertificado);
+            return ResultadoOperacion<X509Certificate2>.DeErrorSistema(ex.Message);
+        }
     }
 
     private async Task<byte[]?> DescargarDeS3Async(string clave, CancellationToken cancellationToken)
