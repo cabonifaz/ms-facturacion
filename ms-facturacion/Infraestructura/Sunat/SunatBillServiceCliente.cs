@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -26,20 +25,6 @@ public sealed class SunatBillServiceCliente(
         string url, string usuarioSolCompleto, string claveSol, string nombreArchivoZip, byte[] zipBytes,
         CancellationToken cancellationToken)
     {
-        // Métrica de costo real del envío: tiempo de reloj (dominado por la red/SUNAT, no por CPU local), CPU
-        // y bytes asignados, para poder dimensionar la instancia sin adivinar. Todo esto se mide a nivel de
-        // proceso (Process.GetCurrentProcess() / GC.GetTotalAllocatedBytes), no de hilo — GetAllocatedBytesForCurrentThread
-        // se probó primero pero da valores sin sentido (incluso negativos) porque este método tiene awaits:
-        // la continuación puede reanudar en un hilo del pool distinto al que arrancó la medición. Como
-        // contrapartida, si el proceso atiende otras requests en paralelo esos deltas incluyen ese ruido —
-        // señal real de costo igual, ya que sendBill en sí no tiene paralelismo interno.
-        // Se loguea siempre (no solo en Development) porque es dato de capacidad, no contenido sensible.
-        var cronometro = Stopwatch.StartNew();
-        var bytesAsignadosAntes = GC.GetTotalAllocatedBytes();
-        var procesoActual = Process.GetCurrentProcess();
-        var cpuAntes = procesoActual.TotalProcessorTime;
-        var ramAntesKb = procesoActual.WorkingSet64 / 1024;
-
         try
         {
             if (entorno.IsDevelopment())
@@ -73,10 +58,8 @@ public sealed class SunatBillServiceCliente(
             };
             solicitud.Headers.TryAddWithoutValidation("SOAPAction", "\"\"");
 
-            var cronometroHttp = Stopwatch.StartNew();
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
-            cronometroHttp.Stop();
 
             if (entorno.IsDevelopment())
             {
@@ -92,30 +75,16 @@ public sealed class SunatBillServiceCliente(
                     faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.");
             }
 
-            var resultado = InterpretarRespuesta(cuerpoRespuesta);
-
-            var cpuMs = (procesoActual.TotalProcessorTime - cpuAntes).TotalMilliseconds;
-            var ramDespuesKb = procesoActual.WorkingSet64 / 1024;
-
-            logger.LogInformation(
-                "sendBill — costo: {ElapsedMs} ms totales ({HttpMs} ms en la llamada HTTP a SUNAT), " +
-                "{ZipBytes} bytes de ZIP, {EnvelopeBytes} bytes de envelope SOAP, {ResponseBytes} bytes de respuesta, " +
-                "{AllocatedKb} KB asignados (proceso) | CPU proceso: {CpuMs} ms | RAM proceso (working set): " +
-                "{RamAntesMb} MB -> {RamDespuesMb} MB ({RamDeltaMb:+0;-0;0} MB).",
-                cronometro.ElapsedMilliseconds, cronometroHttp.ElapsedMilliseconds,
-                zipBytes.Length, xmlSobreEnvio.Length, cuerpoRespuesta.Length,
-                (GC.GetTotalAllocatedBytes() - bytesAsignadosAntes) / 1024,
-                cpuMs, ramAntesKb / 1024, ramDespuesKb / 1024, (ramDespuesKb - ramAntesKb) / 1024);
-
-            return resultado;
+            return InterpretarRespuesta(cuerpoRespuesta);
         }
         catch (Exception ex)
         {
-            var cpuMs = (procesoActual.TotalProcessorTime - cpuAntes).TotalMilliseconds;
-            logger.LogWarning(
-                "sendBill — falló a los {ElapsedMs} ms ({AllocatedKb} KB asignados (proceso), {CpuMs} ms CPU proceso): {Mensaje}",
-                cronometro.ElapsedMilliseconds, (GC.GetTotalAllocatedBytes() - bytesAsignadosAntes) / 1024, cpuMs, ex.Message);
-
+            // Antes esto se tragaba en silencio: solo quedaba ex.Message en el envelope de respuesta, nada
+            // en el log. En un entorno distinto al de desarrollo (DNS/firewall/proxy/TLS distintos) esta es
+            // la llamada de red más probable de fallar de forma diferente que en local — sin esto no había
+            // forma de ver el tipo real de excepción (HttpRequestException/TaskCanceledException por
+            // timeout/AuthenticationException por TLS/etc.) ni su InnerException.
+            logger.LogError(ex, "sendBill — excepción no controlada al llamar a {Url}.", url);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(ex.Message);
         }
     }

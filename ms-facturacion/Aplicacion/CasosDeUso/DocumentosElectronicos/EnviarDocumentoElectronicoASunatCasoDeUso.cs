@@ -25,7 +25,8 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     IArchivoDocumentoRepositorio archivoRepositorio,
     ITransmisionSunatRepositorio transmisionRepositorio,
     ISunatBillServiceCliente sunatCliente,
-    IErrorDocumentoRepositorio errorRepositorio)
+    IErrorDocumentoRepositorio errorRepositorio,
+    ILogger<EnviarDocumentoElectronicoASunatCasoDeUso> logger)
 {
     private static readonly string[] TiposDocumentoSoportados = ["01", "03", "07", "08"];
     private const string UsuarioWorker = "ms-facturacion-worker";
@@ -33,9 +34,38 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
     public async Task<ResultadoOperacion<ResultadoEnvioSunat>> EjecutarAsync(
         int idInquilino, int idDocumentoElectronico, string ambienteCodigo, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "EnviarASunat — inicio. idInquilino={IdInquilino}, idDocumentoElectronico={IdDocumentoElectronico}, ambienteCodigo={AmbienteCodigo}.",
+            idInquilino, idDocumentoElectronico, ambienteCodigo);
+
+        try
+        {
+            return await EjecutarInternoAsync(idInquilino, idDocumentoElectronico, ambienteCodigo, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Antes de esto, una excepción en cualquier paso (armado de XML, firma, S3, HTTP a SUNAT, etc.)
+            // no quedaba registrada en ningún lado — no hay middleware de excepciones global en este proyecto
+            // (Program.cs no tiene UseExceptionHandler) y ninguno de estos pasos loguea por su cuenta, así
+            // que el único rastro era un 500 crudo sin detalle. Se loguea acá con el stack trace completo
+            // (incluye InnerException, clave para diferenciar p.ej. una falla de TLS/DNS/certificado de una
+            // de credenciales AWS al desplegar en un entorno distinto al de desarrollo).
+            logger.LogError(
+                ex, "EnviarASunat — excepción no controlada. idInquilino={IdInquilino}, idDocumentoElectronico={IdDocumentoElectronico}, ambienteCodigo={AmbienteCodigo}.",
+                idInquilino, idDocumentoElectronico, ambienteCodigo);
+
+            return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    private async Task<ResultadoOperacion<ResultadoEnvioSunat>> EjecutarInternoAsync(
+        int idInquilino, int idDocumentoElectronico, string ambienteCodigo, CancellationToken cancellationToken)
+    {
         var documento = await documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         if (documento.IdTipoMensaje != TipoMensaje.Exito || documento.Datos is null)
         {
+            logger.LogWarning(
+                "EnviarASunat — falló al obtener el documento (paso 1/lectura inicial): {Mensaje}", documento.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(documento.IdTipoMensaje, documento.Mensaje, default);
         }
 
@@ -43,12 +73,16 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         if (!TiposDocumentoSoportados.Contains(cabecera.TipoDocumentoCodigo))
         {
+            logger.LogWarning(
+                "EnviarASunat — tipo de documento no soportado: {TipoDocumentoCodigo}.", cabecera.TipoDocumentoCodigo);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                 "El Worker todavía no soporta el envío síncrono para este tipo de documento (solo Factura/Boleta/Nota de Crédito/Nota de Débito por ahora).");
         }
 
         if (cabecera.EstadoCodigo is not ("PendienteEnvio" or "Error"))
         {
+            logger.LogWarning(
+                "EnviarASunat — el documento ya no está en un estado enviable: {EstadoCodigo}.", cabecera.EstadoCodigo);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                 $"El documento ya fue procesado (estado actual: {cabecera.EstadoCodigo}).");
         }
@@ -61,6 +95,9 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             var totalCuotas = documento.Datos.Cuotas.Sum(c => c.Monto);
             if (Math.Round(totalCuotas, 2) != Math.Round(cabecera.TotalImporte, 2))
             {
+                logger.LogWarning(
+                    "EnviarASunat — cuotas ({TotalCuotas}) no coinciden con el total del documento ({TotalImporte}).",
+                    totalCuotas, cabecera.TotalImporte);
                 return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                     "La suma de las cuotas no coincide con el total del documento. Corrija las cuotas antes de confirmar con SUNAT.");
             }
@@ -74,12 +111,14 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), cancellationToken);
         if (actualizacionFecha.IdTipoMensaje != TipoMensaje.Exito)
         {
+            logger.LogWarning("EnviarASunat — falló al actualizar fecha/hora de emisión: {Mensaje}", actualizacionFecha.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(actualizacionFecha.IdTipoMensaje, actualizacionFecha.Mensaje, default);
         }
 
         documento = await documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         if (documento.IdTipoMensaje != TipoMensaje.Exito || documento.Datos is null)
         {
+            logger.LogWarning("EnviarASunat — falló al releer el documento tras actualizar la fecha: {Mensaje}", documento.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(documento.IdTipoMensaje, documento.Mensaje, default);
         }
         cabecera = documento.Datos.Cabecera;
@@ -87,6 +126,8 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var empresa = await empresaRepositorio.ObtenerAsync(idInquilino, cabecera.IdEmpresa, cancellationToken);
         if (empresa.IdTipoMensaje != TipoMensaje.Exito || empresa.Datos is null)
         {
+            logger.LogWarning(
+                "EnviarASunat — falló al obtener la empresa (idEmpresa={IdEmpresa}): {Mensaje}", cabecera.IdEmpresa, empresa.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(empresa.IdTipoMensaje, empresa.Mensaje, default);
         }
 
@@ -94,11 +135,17 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             idInquilino, cabecera.IdEmpresa, ambienteCodigo, cancellationToken);
         if (configuracion.IdTipoMensaje != TipoMensaje.Exito || configuracion.Datos is null)
         {
+            logger.LogWarning(
+                "EnviarASunat — falló al obtener la configuración de facturación (idEmpresa={IdEmpresa}, ambienteCodigo={AmbienteCodigo}): {Mensaje}",
+                cabecera.IdEmpresa, ambienteCodigo, configuracion.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(configuracion.IdTipoMensaje, configuracion.Mensaje, default);
         }
 
         if (string.IsNullOrWhiteSpace(configuracion.Datos.UrlEnvioFacturaBoletaNota))
         {
+            logger.LogWarning(
+                "EnviarASunat — la configuración de facturación (idEmpresa={IdEmpresa}, ambienteCodigo={AmbienteCodigo}) no tiene UrlEnvioFacturaBoletaNota.",
+                cabecera.IdEmpresa, ambienteCodigo);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                 "La configuración de facturación de la empresa no tiene URL de envío de Factura/Boleta/Nota.");
         }
@@ -107,12 +154,16 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             idInquilino, cabecera.IdEmpresa, configuracion.Datos.IdCertificado, cancellationToken);
         if (certificado.IdTipoMensaje != TipoMensaje.Exito || certificado.Datos is null)
         {
+            logger.LogWarning(
+                "EnviarASunat — falló al obtener/cargar el certificado (idCertificado={IdCertificado}): {Mensaje}",
+                configuracion.Datos.IdCertificado, certificado.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(certificado.IdTipoMensaje, certificado.Mensaje, default);
         }
 
         var claveSol = await credencialRepositorio.ObtenerPorTipoAsync(idInquilino, cabecera.IdEmpresa, "ClaveSol", cancellationToken);
         if (claveSol.IdTipoMensaje != TipoMensaje.Exito || claveSol.Datos is null)
         {
+            logger.LogWarning("EnviarASunat — falló al obtener la credencial ClaveSol: {Mensaje}", claveSol.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(claveSol.IdTipoMensaje, claveSol.Mensaje, default);
         }
 
@@ -120,8 +171,13 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             idInquilino, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
         if (claveSolDescifrada.IdTipoMensaje != TipoMensaje.Exito || claveSolDescifrada.Datos is null)
         {
+            logger.LogWarning("EnviarASunat — falló al descifrar la ClaveSol: {Mensaje}", claveSolDescifrada.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, default);
         }
+
+        logger.LogInformation(
+            "EnviarASunat — construyendo y firmando XML. idDocumentoElectronico={IdDocumentoElectronico}, tipoDocumentoCodigo={TipoDocumentoCodigo}, serie={Serie}, correlativo={Correlativo}.",
+            cabecera.IdDocumentoElectronico, cabecera.TipoDocumentoCodigo, cabecera.Serie, cabecera.Correlativo);
 
         var xmlSinFirmar = constructorXml.Construir(documento.Datos, empresa.Datos);
         var xmlFirmado = firmador.Firmar(xmlSinFirmar, certificado.Datos);
@@ -159,14 +215,23 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)
         {
+            logger.LogWarning("EnviarASunat — falló al registrar el intento de transmisión: {Mensaje}", transmision.Mensaje);
             return new ResultadoOperacion<ResultadoEnvioSunat>(transmision.IdTipoMensaje, transmision.Mensaje, default);
         }
+
+        logger.LogInformation(
+            "EnviarASunat — llamando a sendBill. idDocumentoElectronico={IdDocumentoElectronico}, url={Url}, zipBytes={ZipBytes}.",
+            cabecera.IdDocumentoElectronico, configuracion.Datos.UrlEnvioFacturaBoletaNota, zipBytes.Length);
 
         var envio = await sunatCliente.EnviarAsync(
             configuracion.Datos.UrlEnvioFacturaBoletaNota, usuarioSolCompleto, claveSolDescifrada.Datos, nombreArchivoZip, zipBytes, cancellationToken);
 
         if (envio.IdTipoMensaje != TipoMensaje.Exito || envio.Datos is null)
         {
+            logger.LogWarning(
+                "EnviarASunat — sendBill falló. idDocumentoElectronico={IdDocumentoElectronico}, idTipoMensaje={IdTipoMensaje}: {Mensaje}",
+                cabecera.IdDocumentoElectronico, envio.IdTipoMensaje, envio.Mensaje);
+
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
                 new ResultadoTransmisionSunat(EstadoMaestroCodigo.Error, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
@@ -174,6 +239,10 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
             return new ResultadoOperacion<ResultadoEnvioSunat>(envio.IdTipoMensaje, envio.Mensaje, default);
         }
+
+        logger.LogInformation(
+            "EnviarASunat — sendBill respondió. idDocumentoElectronico={IdDocumentoElectronico}, estadoCodigo={EstadoCodigo}, sunatCodigoRespuesta={SunatCodigoRespuesta}.",
+            cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo, envio.Datos.SunatCodigoRespuesta);
 
         var idArchivoCdr = await GuardarYRegistrarArchivoAsync(
             idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
@@ -224,6 +293,10 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             sunatHash, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
             cancellationToken);
 
+        logger.LogInformation(
+            "EnviarASunat — fin. idDocumentoElectronico={IdDocumentoElectronico}, estadoCodigo={EstadoCodigo}.",
+            cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo);
+
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("Documento procesado por SUNAT.", envio.Datos);
     }
 
@@ -238,6 +311,16 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             idDocumentoElectronico, null, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);
 
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+        if (resultado.IdTipoMensaje != TipoMensaje.Exito)
+        {
+            // No se propaga como falla del envío completo (el archivo ya está en S3, y el resto del flujo
+            // puede seguir sin este registro) — pero antes esto se perdía en silencio: el envío a SUNAT
+            // seguía como si nada, dejando ARCHIVOS_DOCUMENTO_ELECTRONICO desincronizado sin ningún rastro.
+            logger.LogWarning(
+                "EnviarASunat — se guardó {NombreArchivo} en S3 pero falló registrar el archivo en la base de datos: {Mensaje}",
+                nombreArchivo, resultado.Mensaje);
+        }
+
         return resultado.IdTipoMensaje == TipoMensaje.Exito ? resultado.Datos : null;
     }
 
