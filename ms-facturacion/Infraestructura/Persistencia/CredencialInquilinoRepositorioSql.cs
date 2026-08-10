@@ -104,7 +104,10 @@ public sealed class CredencialInquilinoRepositorioSql(
         // SoftDelete=0; si "no encuentra" la credencial pese a existir una fila, lo más probable es que uno
         // de estos tres valores (sobre todo TipoCredencialCodigo, texto libre) no coincida exactamente con
         // lo que hay en CREDENCIALES_INQUILINO — esto lo deja explícito en vez de tener que asumirlo.
-        logger.LogInformation(
+        // LogWarning, no LogInformation: Preprod tiene Logging__LogLevel__Default en un nivel que filtra
+        // Information (se vio en el log anterior que solo pasaban las líneas warn:) — esta línea necesita
+        // verse ahí sin tener que tocar esa configuración de Azure aparte.
+        logger.LogWarning(
             "CredencialInquilino.ObtenerPorTipo — buscando. idInquilino={IdInquilino}, idEmpresa={IdEmpresa}, tipoCredencialCodigo='{TipoCredencialCodigo}' (longitud={Longitud}).",
             idInquilino, idEmpresa, tipoCredencialCodigo, tipoCredencialCodigo.Length);
 
@@ -139,7 +142,7 @@ public sealed class CredencialInquilinoRepositorioSql(
                 (byte[])lector["Nonce"],
                 (byte[])lector["Tag"]);
 
-            logger.LogInformation(
+            logger.LogWarning(
                 "CredencialInquilino.ObtenerPorTipo — encontrada. idCredencialInquilino={IdCredencialInquilino}, usuario='{Usuario}', valorCifradoBytes={ValorCifradoBytes}.",
                 credencial.IdCredencialInquilino, credencial.Usuario, credencial.ValorCifrado.Length);
 
