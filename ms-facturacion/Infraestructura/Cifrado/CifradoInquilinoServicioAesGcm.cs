@@ -10,7 +10,8 @@ namespace ms_facturacion.Infraestructura.Cifrado;
 /// datos) — sin envelope encryption ni llave de datos por tenant (ver LLAVES_CIFRADO_INQUILINO, removida:
 /// esa capa no aportaba nada que la llave maestra fuera de la BD no diera ya, para el alcance actual de
 /// un solo tipo de credencial por empresa).
-public sealed class CifradoInquilinoServicioAesGcm(IConfiguration configuracion) : ICifradoInquilinoServicio
+public sealed class CifradoInquilinoServicioAesGcm(
+    IConfiguration configuracion, ILogger<CifradoInquilinoServicioAesGcm> logger) : ICifradoInquilinoServicio
 {
     private const int TamanoNonce = 12;
     private const int TamanoTag = 16;
@@ -39,12 +40,27 @@ public sealed class CifradoInquilinoServicioAesGcm(IConfiguration configuracion)
     public Task<ResultadoOperacion<string>> DescifrarAsync(
         int idInquilino, byte[] valorCifrado, byte[] nonce, byte[] tag, CancellationToken cancellationToken)
     {
-        var textoPlanoBytes = new byte[valorCifrado.Length];
-        using (var aesGcm = new AesGcm(LlaveMaestra, TamanoTag))
+        try
         {
-            aesGcm.Decrypt(nonce, valorCifrado, tag, textoPlanoBytes);
-        }
+            var textoPlanoBytes = new byte[valorCifrado.Length];
+            using (var aesGcm = new AesGcm(LlaveMaestra, TamanoTag))
+            {
+                aesGcm.Decrypt(nonce, valorCifrado, tag, textoPlanoBytes);
+            }
 
-        return Task.FromResult(ResultadoOperacion<string>.DeExito("Valor descifrado correctamente.", Encoding.UTF8.GetString(textoPlanoBytes)));
+            return Task.FromResult(ResultadoOperacion<string>.DeExito("Valor descifrado correctamente.", Encoding.UTF8.GetString(textoPlanoBytes)));
+        }
+        catch (Exception ex)
+        {
+            // Sin try/catch hasta ahora — si Cifrado:LlaveMaestraBase64 en este entorno no es la misma llave
+            // con la que se cifró el valor en la base de datos (p.ej. configurada distinto en Azure App
+            // Settings que en appsettings.json local/staging), AesGcm.Decrypt tira CryptographicException
+            // ("el tag de autenticación no coincide") — antes eso escalaba crudo sin loguear nada acá. Esta
+            // llamada se usa dos veces en la cadena de envío a SUNAT (ClaveSol y ClaveCertificado) y en
+            // ningún otro endpoint que no toque ese flujo, así que es el sospechoso principal cuando otros
+            // endpoints (p.ej. listarFacturas) sí funcionan pero el envío falla.
+            logger.LogError(ex, "CifradoInquilino — falló al descifrar (idInquilino={IdInquilino}).", idInquilino);
+            return Task.FromResult(ResultadoOperacion<string>.DeErrorSistema(ex.Message));
+        }
     }
 }

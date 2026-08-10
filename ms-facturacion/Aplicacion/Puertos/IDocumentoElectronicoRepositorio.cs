@@ -8,7 +8,7 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken);
@@ -27,6 +27,11 @@ public interface IDocumentoElectronicoRepositorio
     /// SP_DocumentoElectronico_ObtenerPorToken y DocumentoElectronicoDetallePublico.
     Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
         string tokenPublico, CancellationToken cancellationToken);
+
+    /// Cliente + líneas de un documento ya emitido, sin resolver los Num1 contra TABLA_MAESTRA — para
+    /// prellenar/listar ambos al armar una Nota de Crédito/Débito contra ese documento.
+    Task<ResultadoOperacion<DatosParaNota>> ObtenerParaNotaAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
@@ -55,9 +60,12 @@ public interface IDocumentoElectronicoRepositorio
     /// "Guardar cambios" en lote: reemplaza el diseño anterior de 6 endpoints granulares (Agregar/Actualizar/
     /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
+    /// idMotivoMaestro: solo aplica a Nota de Crédito/Débito (null en Factura/Boleta) — a diferencia de
+    /// documentoAfectado/idDocumentoElectronicoRelacionado (fijo desde Insertar), el motivo sí es editable
+    /// mientras el documento siga PendienteEnvio.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 

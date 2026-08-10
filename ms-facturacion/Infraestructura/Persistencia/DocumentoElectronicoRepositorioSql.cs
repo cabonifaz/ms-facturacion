@@ -16,7 +16,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCreado>> InsertarAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, string idExterno, string? numeroReferencia,
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int idFormaPago, ClienteDatosEntrada cliente,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
@@ -37,7 +37,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
             comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
-            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
             comando.Parameters.AddWithValue("@vchClienteNumeroDocumento", cliente.NumeroDocumento);
             comando.Parameters.AddWithValue("@vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
@@ -45,9 +45,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intClientePaisCodigo", cliente.PaisCodigo);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchTipoReferenciaCodigo", (object?)documentoAfectado?.TipoReferenciaCodigo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchMotivoCodigo", (object?)documentoAfectado?.MotivoCodigo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchMotivoDescripcion", (object?)documentoAfectado?.MotivoDescripcion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdMotivoMaestro", (object?)documentoAfectado?.IdMotivoMaestro ?? DBNull.Value);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO";
@@ -127,7 +125,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 MonedaCodigo = lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                 TipoCambio = lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
                 TipoOperacionCodigo = lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
-                FormaPagoCodigo = lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
+                FormaPagoCodigo = LeerNullableString(lector, "FormaPagoCodigo"),
                 EmpresaRuc = lector.GetString(lector.GetOrdinal("EmpresaRuc")),
                 EmpresaRazonSocial = lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
                 EmpresaNombreComercial = LeerNullableString(lector, "EmpresaNombreComercial"),
@@ -198,7 +196,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
                     lector.GetString(lector.GetOrdinal("SerieRelacionada")),
                     lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
-                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
             }
@@ -261,6 +258,54 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<DatosParaNota>> ObtenerParaNotaAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerParaNota", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<DatosParaNota>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var cliente = new ClienteDatosEntrada(
+                lector.GetInt32(lector.GetOrdinal("IdTipoDocumentoSunat")),
+                lector.GetString(lector.GetOrdinal("NumeroDocumento")),
+                LeerNullableString(lector, "Nombre"),
+                LeerNullableString(lector, "Correo"),
+                LeerNullableString(lector, "Direccion"),
+                lector.GetInt32(lector.GetOrdinal("PaisCodigo")));
+
+            await lector.NextResultAsync(cancellationToken);
+            var productos = new List<ProductoDocumentoResumen>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                productos.Add(new ProductoDocumentoResumen(
+                    lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+                    lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
+            }
+
+            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, productos));
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<DatosParaNota>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
         string tokenPublico, CancellationToken cancellationToken)
     {
@@ -295,7 +340,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                 lector.IsDBNull(lector.GetOrdinal("TipoCambio")) ? null : lector.GetDecimal(lector.GetOrdinal("TipoCambio")),
                 lector.GetString(lector.GetOrdinal("TipoOperacionCodigo")),
-                lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
+                LeerNullableString(lector, "FormaPagoCodigo"),
                 lector.GetString(lector.GetOrdinal("EmpresaRuc")),
                 lector.GetString(lector.GetOrdinal("EmpresaRazonSocial")),
                 LeerNullableString(lector, "EmpresaNombreComercial"),
@@ -362,7 +407,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("TipoDocumentoRelacionadoCodigo")),
                     lector.GetString(lector.GetOrdinal("SerieRelacionada")),
                     lector.GetInt32(lector.GetOrdinal("CorrelativoRelacionado")),
-                    lector.GetString(lector.GetOrdinal("TipoReferenciaCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoCodigo")),
                     lector.GetString(lector.GetOrdinal("MotivoDescripcion")));
             }
@@ -485,6 +529,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 items.Add(new FacturaResumenPedidoFactura(
                     lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                     lector.GetString(lector.GetOrdinal("NumeroFactura")),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoTexto")),
                     lector.GetString(lector.GetOrdinal("ClienteNombre")),
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                     lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
@@ -636,8 +681,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idFormaPago, string? numeroReferencia,
-        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
+        int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
     {
@@ -649,11 +694,12 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intIdFormaPago", idFormaPago);
+            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
             comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
+            comando.Parameters.AddWithValue("@intIdMotivoMaestro", (object?)idMotivoMaestro ?? DBNull.Value);
 
             var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
             tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION";

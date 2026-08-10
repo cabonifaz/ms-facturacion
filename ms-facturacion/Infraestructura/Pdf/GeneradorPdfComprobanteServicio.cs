@@ -159,7 +159,17 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         y = DibujarCampo("Señor(es)", cabecera.ClienteNombre);
         y = DibujarCampoDosLineas("Establecimiento del Emisor", empresa.Direccion, ciudadEmpresa) + 12;
         y = DibujarCampo("Tipo de Moneda", nombreMoneda);
-        y = DibujarCampo("Observación", cabecera.NumeroReferencia ?? "") + 6;
+        y = DibujarCampo("Observación", cabecera.NumeroReferencia ?? "");
+
+        // Documento que se modifica — solo existe para Nota de Crédito/Débito (documento.Referencia es
+        // null en Factura/Boleta, ver DocumentoElectronicoDetalle/SP_DocumentoElectronico_Obtener).
+        if (documento.Referencia is { } referencia)
+        {
+            y = DibujarCampo("Documento que Modifica", $"{referencia.SerieRelacionada}-{referencia.CorrelativoRelacionado}");
+            y = DibujarCampo("Motivo", $"{referencia.MotivoCodigo} - {referencia.MotivoDescripcion}");
+        }
+
+        y += 6;
 
         // ===== Campos extra (texto libre cargado por el usuario, sin relación con SUNAT) — mitad derecha
         // de la página, un renglón por campo, protegido contra overflow igual que todo lo demás. =====

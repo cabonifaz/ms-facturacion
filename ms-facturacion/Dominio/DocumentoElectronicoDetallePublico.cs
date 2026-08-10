@@ -11,7 +11,7 @@ public sealed record DocumentoElectronicoDetallePublico(
 
 public sealed record DocumentoElectronicoPublico(
     string? NumeroReferencia, string TipoDocumentoCodigo, string Serie, int Correlativo, string EstadoCodigo,
-    DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, decimal? TipoCambio, string TipoOperacionCodigo, string FormaPagoCodigo,
+    DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, decimal? TipoCambio, string TipoOperacionCodigo, string? FormaPagoCodigo,
     string EmpresaRuc, string EmpresaRazonSocial, string? EmpresaNombreComercial, string EmpresaDireccion, string EmpresaUbigeo,
     string ClienteTipoDocumentoCodigo, string ClienteNumeroDocumento, string ClienteNombre, string? ClienteDireccion,
     string? ClienteCorreo, string ClientePaisCodigo,
@@ -28,7 +28,7 @@ public sealed record LineaDocumentoElectronicoPublica(
 
 public sealed record ReferenciaDocumentoElectronicaPublica(
     string TipoDocumentoRelacionadoCodigo, string SerieRelacionada, int CorrelativoRelacionado,
-    string TipoReferenciaCodigo, string MotivoCodigo, string MotivoDescripcion);
+    string MotivoCodigo, string MotivoDescripcion);
 
 public sealed record CuotaDocumentoElectronicaPublica(
     int NumeroCuota, DateOnly FechaVencimiento, decimal Monto, string EstadoCuotaCodigo, DateTime? FechaPago);

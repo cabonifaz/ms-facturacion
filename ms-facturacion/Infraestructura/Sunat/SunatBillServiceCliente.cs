@@ -79,6 +79,12 @@ public sealed class SunatBillServiceCliente(
         }
         catch (Exception ex)
         {
+            // Antes esto se tragaba en silencio: solo quedaba ex.Message en el envelope de respuesta, nada
+            // en el log. En un entorno distinto al de desarrollo (DNS/firewall/proxy/TLS distintos) esta es
+            // la llamada de red más probable de fallar de forma diferente que en local — sin esto no había
+            // forma de ver el tipo real de excepción (HttpRequestException/TaskCanceledException por
+            // timeout/AuthenticationException por TLS/etc.) ni su InnerException.
+            logger.LogError(ex, "sendBill — excepción no controlada al llamar a {Url}.", url);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(ex.Message);
         }
     }

@@ -5,11 +5,11 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Controllers;
 
-public sealed record FormaPagoPeticion(int IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
+public sealed record FormaPagoPeticion(int? IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
 public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
 public sealed record ClientePeticion(
     int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
-public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, string TipoReferenciaCodigo, string MotivoCodigo, string MotivoDescripcion);
+public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
 
 public sealed record ItemPeticion(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
@@ -19,7 +19,7 @@ public sealed record ItemPeticion(
 public sealed record InsertarDocumentoElectronicoPeticion(
     int IdInquilino, int IdEmpresa, string IdExterno, string? NumeroReferencia, int IdTipoDocumentoMaestro,
     int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
-    FormaPagoPeticion FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
+    FormaPagoPeticion? FormaPago, ClientePeticion Cliente, DocumentoAfectadoPeticion? DocumentoAfectado,
     IReadOnlyList<ItemPeticion> Items, IReadOnlyList<CampoExtraPeticion>? CamposExtra = null);
 
 public sealed record ActualizarEstadoSunatPeticion(
@@ -41,9 +41,9 @@ public sealed record CuotaEdicionPeticion(
 public sealed record CampoExtraEdicionPeticion(string Texto, int IdCampoExtraDocumentoElectronico = 0);
 
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
+    int? IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
     IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
-    IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null);
+    IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null, int? IdMotivoMaestro = null);
 
 public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
 
@@ -66,6 +66,7 @@ public sealed class DocumentosElectronicosController(
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
+    ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -81,8 +82,7 @@ public sealed class DocumentosElectronicosController(
         var documentoAfectado = peticion.DocumentoAfectado is null
             ? null
             : new DocumentoAfectadoEntrada(
-                peticion.DocumentoAfectado.IdDocumentoElectronicoRelacionado, peticion.DocumentoAfectado.TipoReferenciaCodigo,
-                peticion.DocumentoAfectado.MotivoCodigo, peticion.DocumentoAfectado.MotivoDescripcion);
+                peticion.DocumentoAfectado.IdDocumentoElectronicoRelacionado, peticion.DocumentoAfectado.IdMotivoMaestro);
 
         var lineas = peticion.Items
             .Select(item => new LineaDocumentoElectronicoEntrada(
@@ -90,7 +90,7 @@ public sealed class DocumentosElectronicosController(
                 item.Cantidad, item.ValorUnitario, item.MontoDescuento, item.IdAfectacionIgvMaestro, item.PorcentajeIgv))
             .ToList();
 
-        var cuotas = (peticion.FormaPago.Cuotas ?? [])
+        var cuotas = (peticion.FormaPago?.Cuotas ?? [])
             .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
             .ToList();
 
@@ -101,7 +101,7 @@ public sealed class DocumentosElectronicosController(
         var resultado = await insertarCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, peticion.IdInquilino, peticion.IdEmpresa, peticion.IdExterno, peticion.NumeroReferencia,
             peticion.IdTipoDocumentoMaestro,
-            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago.IdFormaPago, cliente,
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.FormaPago?.IdFormaPago, cliente,
             documentoAfectado, lineas, cuotas, camposExtra, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
@@ -134,7 +134,8 @@ public sealed class DocumentosElectronicosController(
 
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
-            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, lineas, cuotas, camposExtra, cancellationToken);
+            peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.IdMotivoMaestro,
+            lineas, cuotas, camposExtra, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
@@ -194,6 +195,16 @@ public sealed class DocumentosElectronicosController(
         [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
         var resultado = await obtenerTokenVerificacionCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Cliente + listado de productos de un documento ya emitido, sin resolver — para prellenar el receptor
+    // y listar los productos del documento afectado al armar una Nota de Crédito/Débito.
+    [HttpGet("{idDocumentoElectronico:int}/para-nota")]
+    public async Task<IActionResult> ObtenerParaNota(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerParaNotaCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

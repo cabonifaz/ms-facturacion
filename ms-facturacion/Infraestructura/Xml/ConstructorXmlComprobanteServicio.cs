@@ -64,17 +64,13 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
             new XElement(Cbc + "IssueDate", cabecera.FechaEmision.ToString("yyyy-MM-dd")),
             new XElement(Cbc + "IssueTime", cabecera.HoraEmision.ToString("HH:mm:ss")));
 
-        if (esNota)
+        if (esNota && documento.Referencia is null)
         {
-            if (documento.Referencia is null)
-            {
-                throw new InvalidOperationException(
-                    "El documento es una nota de crédito/débito pero no tiene REFERENCIAS_DOCUMENTO_ELECTRONICO asociada.");
-            }
-
-            raiz.Add(ConstruirDiscrepancyResponse(documento.Referencia));
+            throw new InvalidOperationException(
+                "El documento es una nota de crédito/débito pero no tiene REFERENCIAS_DOCUMENTO_ELECTRONICO asociada.");
         }
-        else
+
+        if (!esNota)
         {
             raiz.Add(
                 new XElement(Cbc + "InvoiceTypeCode", new XAttribute("listID", "0101"), cabecera.TipoDocumentoCodigo),
@@ -83,7 +79,17 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                 new XElement(Cbc + "Note", new XAttribute("languageLocaleID", "1000"), cabecera.TipoOperacionCodigo));
         }
 
+        // cbc:DocumentCurrencyCode debe ir ANTES de cac:DiscrepancyResponse (orden exigido por el XSD
+        // CreditNoteType/DebitNoteType de UBL 2.1) — invertido antes, lo que causaba fault
+        // "found DocumentCurrencyCode, but next item should be AccountingSupplierParty" en SUNAT: al ser
+        // ambos opcionales, el validador saltaba DocumentCurrencyCode en su posición real, calzaba
+        // DiscrepancyResponse más adelante, y luego no lograba ubicar el DocumentCurrencyCode sobrante.
         raiz.Add(new XElement(Cbc + "DocumentCurrencyCode", moneda));
+
+        if (esNota)
+        {
+            raiz.Add(ConstruirDiscrepancyResponse(documento.Referencia!));
+        }
 
         // cac:OrderReference — opcional (0..1 en la guía SUNAT), string plano (an..20) sin validación SUNAT.
         if (!string.IsNullOrEmpty(cabecera.NumeroReferencia))
@@ -99,8 +105,18 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
         raiz.Add(
             ConstruirFirma(cabecera.EmpresaRuc, cabecera.EmpresaRazonSocial),
             ConstruirProveedor(cabecera, empresa),
-            ConstruirCliente(cabecera),
-            ConstruirFormaPago(cabecera.FormaPagoCodigo, documento.Cuotas, cabecera.TotalImporte, moneda));
+            ConstruirCliente(cabecera));
+
+        // cac:PaymentTerms (FormaPago) no existe en el contenido documentado de Nota de Crédito/Débito
+        // (Guía de Elaboración XML UBL 2.1 — tabla de contenido, pág. 4: PaymentTerms no aparece en toda la
+        // guía) — es un concepto propio de Factura/Boleta. Emitirlo en 07/08 causaba fault SUNAT 3246
+        // ("El tipo de transaccion... no cumple con el formato esperado", nodo PaymentTerms/PaymentMeansID).
+        if (!esNota)
+        {
+            // FormaPagoCodigo solo es NULL en Nota de Crédito/Débito (ver SP_DocumentoElectronico_Obtener) —
+            // en esta rama (!esNota) siempre viene resuelto.
+            raiz.Add(ConstruirFormaPago(cabecera.FormaPagoCodigo!, documento.Cuotas, cabecera.TotalImporte, moneda));
+        }
 
         // cac:PaymentExchangeRate — solo cuando el documento trae TipoCambio (moneda extranjera ligada a
         // detracción/percepción/retención, Anexo N.° 7 SUNAT). Target siempre PEN: es el único caso en que
