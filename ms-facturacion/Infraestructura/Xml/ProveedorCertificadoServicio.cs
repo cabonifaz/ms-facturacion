@@ -174,26 +174,62 @@ public sealed class ProveedorCertificadoServicio(
                 }
                 catch (CryptographicException ex)
                 {
-                    logger.LogError(
-                        ex, "ProveedorCertificado — falló al cargar el .pfx (idCertificado={IdCertificado}, clave S3={Clave}, HResult=0x{HResult:X8}).",
-                        idCertificado, certificado.Datos.RutaAlmacenamiento, ex.HResult);
+                    // Cada dato en su propia línea de log — el intento anterior de meter tipo+mensaje+HResult
+                    // en una sola línea salió cortado en Log stream/Kudu (mensaje largo + línea larga se
+                    // truncó a mitad de camino). Separado así, cada línea es corta y ninguna se pierde aunque
+                    // el visor tenga un límite de longitud por línea.
+                    logger.LogError("ProveedorCertificado — intento 1 (EphemeralKeySet) falló. idCertificado={IdCertificado}.", idCertificado);
+                    logger.LogError("ProveedorCertificado — intento 1 tipo excepción: {Tipo}.", ex.GetType().FullName);
+                    logger.LogError("ProveedorCertificado — intento 1 mensaje: {Mensaje}", ex.Message);
+                    logger.LogError("ProveedorCertificado — intento 1 HResult: 0x{HResult:X8}", ex.HResult);
+                    if (ex.InnerException is not null)
+                    {
+                        logger.LogError("ProveedorCertificado — intento 1 InnerException tipo: {Tipo}.", ex.InnerException.GetType().FullName);
+                        logger.LogError("ProveedorCertificado — intento 1 InnerException mensaje: {Mensaje}", ex.InnerException.Message);
+                    }
 
-                    // Segundo intento, sin EphemeralKeySet, solo para el log — si este también falla, se
-                    // reporta también su excepción/HResult (puede diferir del de arriba y acotar más la
-                    // causa real); el resultado que se devuelve sigue siendo el error del primer intento.
+                    // Intento 2: mismo flags pero sin EphemeralKeySet — descarta que el flag en sí sea la causa.
                     try
                     {
-                        using var x509Alternativo = X509CertificateLoader.LoadPkcs12(
+                        using var x509Intento2 = X509CertificateLoader.LoadPkcs12(
                             pfxBytes, clave.Datos, X509KeyStorageFlags.Exportable);
-                        logger.LogWarning(
-                            "ProveedorCertificado — el segundo intento (sin EphemeralKeySet) SÍ cargó el certificado. HasPrivateKey={HasPrivateKey}.",
-                            x509Alternativo.HasPrivateKey);
+                        logger.LogWarning("ProveedorCertificado — intento 2 (sin EphemeralKeySet) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento2.HasPrivateKey);
                     }
-                    catch (CryptographicException exAlternativo)
+                    catch (CryptographicException ex2)
                     {
-                        logger.LogWarning(
-                            "ProveedorCertificado — el segundo intento (sin EphemeralKeySet) también falló: {Tipo}: {Mensaje} (HResult=0x{HResult:X8}).",
-                            exAlternativo.GetType().Name, exAlternativo.Message, exAlternativo.HResult);
+                        logger.LogWarning("ProveedorCertificado — intento 2 (sin EphemeralKeySet) también falló.");
+                        logger.LogWarning("ProveedorCertificado — intento 2 tipo excepción: {Tipo}.", ex2.GetType().FullName);
+                        logger.LogWarning("ProveedorCertificado — intento 2 mensaje: {Mensaje}", ex2.Message);
+                        logger.LogWarning("ProveedorCertificado — intento 2 HResult: 0x{HResult:X8}", ex2.HResult);
+                    }
+
+                    // Intento 3: EphemeralKeySet + Pkcs12LoaderLimits.DangerousNoLimits — el archivo es un
+                    // .p12 (PKCS12, mismo formato que .pfx, la extensión no cambia nada técnicamente) con
+                    // codificación ASN.1 BER de longitud indefinida (ver "3080..." al inicio del hex crudo
+                    // logueado más arriba) — no la DER de longitud definida típica de OpenSSL. Los límites
+                    // por defecto de X509CertificateLoader (introducidos en .NET 9 como endurecimiento contra
+                    // PKCS12 maliciosos/DoS) podrían estar rechazando una estructura legítima pero atípica de
+                    // esta CA (RENIEC) antes de siquiera llegar al password. DangerousNoLimits existe
+                    // específicamente para diagnosticar/permitir este caso.
+                    try
+                    {
+                        using var x509Intento3 = X509CertificateLoader.LoadPkcs12(
+                            pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable,
+                            Pkcs12LoaderLimits.DangerousNoLimits);
+                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento3.HasPrivateKey);
+                    }
+                    catch (CryptographicException ex3)
+                    {
+                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) también falló.");
+                        logger.LogWarning("ProveedorCertificado — intento 3 tipo excepción: {Tipo}.", ex3.GetType().FullName);
+                        logger.LogWarning("ProveedorCertificado — intento 3 mensaje: {Mensaje}", ex3.Message);
+                        logger.LogWarning("ProveedorCertificado — intento 3 HResult: 0x{HResult:X8}", ex3.HResult);
+                    }
+                    catch (Exception ex3General)
+                    {
+                        // Pkcs12LoadLimitExceededException u otra no-CryptographicException también son
+                        // señal útil acá — no se descarta ningún tipo de excepción en este intento de más.
+                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) falló con excepción no criptográfica: {Tipo}: {Mensaje}", ex3General.GetType().FullName, ex3General.Message);
                     }
 
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
