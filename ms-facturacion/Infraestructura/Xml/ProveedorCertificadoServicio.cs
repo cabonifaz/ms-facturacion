@@ -73,6 +73,19 @@ public sealed class ProveedorCertificadoServicio(
                 "ProveedorCertificado — resultado de la descarga S3. clave={Clave}, encontrado={Encontrado}, bytes={Bytes}.",
                 certificado.Datos.RutaAlmacenamiento, pfxBytes is not null, pfxBytes?.Length ?? 0);
 
+            // Log crudo: primeros/últimos bytes en hex del .pfx tal cual llegó de S3 — un PKCS12 válido
+            // arranca con la secuencia ASN.1 "30" (SEQUENCE); si en Azure llegara distinto a lo que se ve
+            // acá o distinto de lo descargado en la prueba local, sería evidencia de que el archivo se
+            // corrompe en tránsito (proxy/encoding), no un problema de contraseña.
+            if (pfxBytes is not null)
+            {
+                var prefijo = Convert.ToHexString(pfxBytes.AsSpan(0, Math.Min(32, pfxBytes.Length)));
+                var sufijo = Convert.ToHexString(pfxBytes.AsSpan(Math.Max(0, pfxBytes.Length - 16)));
+                logger.LogWarning(
+                    "ProveedorCertificado — .pfx crudo: bytes={Bytes}, primeros32Hex={Prefijo}, ultimos16Hex={Sufijo}.",
+                    pfxBytes.Length, prefijo, sufijo);
+            }
+
             X509Certificate2 x509;
 
             if (entorno.IsDevelopment() && pfxBytes is null)
@@ -107,6 +120,14 @@ public sealed class ProveedorCertificadoServicio(
                     return new ResultadoOperacion<X509Certificate2>(credencial.IdTipoMensaje, credencial.Mensaje, default);
                 }
 
+                // Log crudo de lo que efectivamente se lee de CREDENCIALES_INQUILINO antes de intentar
+                // descifrarlo — hex completo (son pocos bytes: ValorCifrado suele ser tan largo como la
+                // contraseña, Nonce=12, Tag=16), para poder reproducir el descifrado exacto fuera de la app
+                // si algo falla, igual que se hizo manualmente para diagnosticar este mismo problema antes.
+                logger.LogWarning(
+                    "ProveedorCertificado — credencial cruda: valorCifradoHex={ValorCifradoHex}, nonceHex={NonceHex}, tagHex={TagHex}.",
+                    Convert.ToHexString(credencial.Datos.ValorCifrado), Convert.ToHexString(credencial.Datos.Nonce), Convert.ToHexString(credencial.Datos.Tag));
+
                 var clave = await cifradoServicio.DescifrarAsync(
                     idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
                 if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
@@ -115,11 +136,37 @@ public sealed class ProveedorCertificadoServicio(
                     return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);
                 }
 
+                // Log crudo del resultado descifrado — bytes UTF8 en hex (no el texto plano en claro) más
+                // longitud en caracteres, para poder comparar byte a byte contra una prueba local sin tener
+                // que loguear la contraseña real en texto.
+                var claveBytesUtf8 = System.Text.Encoding.UTF8.GetBytes(clave.Datos);
+                logger.LogWarning(
+                    "ProveedorCertificado — clave descifrada: longitudCaracteres={LongitudCaracteres}, bytesUtf8Hex={BytesUtf8Hex}.",
+                    clave.Datos.Length, Convert.ToHexString(claveBytesUtf8));
+
+                // Diagnóstico previo al intento: si WEBSITE_LOAD_USER_PROFILE realmente cargó un perfil de
+                // usuario real para este proceso, ApplicationData/UserProfile deberían resolver a una ruta
+                // real (algo bajo C:\Windows\system32\config\systemprofile o similar en el sandbox de Azure
+                // sin perfil, vs. una ruta de usuario real si el setting funcionó). Se loguea antes del
+                // intento porque si LoadPkcs12 falla, igual queremos ver esto — no depende de si la carga
+                // tuvo éxito o no.
+                logger.LogWarning(
+                    "ProveedorCertificado — diagnóstico de entorno antes de cargar el .pfx: usuario={Usuario}, " +
+                    "ApplicationData='{ApplicationData}', UserProfile='{UserProfile}', LocalApplicationData='{LocalApplicationData}', " +
+                    "TEMP={Temp}.",
+                    Environment.UserName,
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    Path.GetTempPath());
+
                 // Punto de falla frecuente al cambiar de entorno: EphemeralKeySet + el proveedor de
                 // criptografía difieren entre Windows (dev) y Linux (p.ej. Azure App Service Linux), y un
                 // .pfx corrupto/con clave incorrecta también revienta acá con CryptographicException — antes
                 // no había forma de distinguir estos casos del resto de la cadena sin loguear el tipo real
-                // de excepción.
+                // de excepción. HResult se agrega porque el Message ("The system cannot find the file
+                // specified") es genérico y engañoso — el código real detrás puede señalar la causa exacta
+                // (p.ej. un error de perfil/CryptoAPI específico) mejor que el texto.
                 try
                 {
                     x509 = X509CertificateLoader.LoadPkcs12(
@@ -128,8 +175,27 @@ public sealed class ProveedorCertificadoServicio(
                 catch (CryptographicException ex)
                 {
                     logger.LogError(
-                        ex, "ProveedorCertificado — falló al cargar el .pfx (idCertificado={IdCertificado}, clave S3={Clave}).",
-                        idCertificado, certificado.Datos.RutaAlmacenamiento);
+                        ex, "ProveedorCertificado — falló al cargar el .pfx (idCertificado={IdCertificado}, clave S3={Clave}, HResult=0x{HResult:X8}).",
+                        idCertificado, certificado.Datos.RutaAlmacenamiento, ex.HResult);
+
+                    // Segundo intento, sin EphemeralKeySet, solo para el log — si este también falla, se
+                    // reporta también su excepción/HResult (puede diferir del de arriba y acotar más la
+                    // causa real); el resultado que se devuelve sigue siendo el error del primer intento.
+                    try
+                    {
+                        using var x509Alternativo = X509CertificateLoader.LoadPkcs12(
+                            pfxBytes, clave.Datos, X509KeyStorageFlags.Exportable);
+                        logger.LogWarning(
+                            "ProveedorCertificado — el segundo intento (sin EphemeralKeySet) SÍ cargó el certificado. HasPrivateKey={HasPrivateKey}.",
+                            x509Alternativo.HasPrivateKey);
+                    }
+                    catch (CryptographicException exAlternativo)
+                    {
+                        logger.LogWarning(
+                            "ProveedorCertificado — el segundo intento (sin EphemeralKeySet) también falló: {Tipo}: {Mensaje} (HResult=0x{HResult:X8}).",
+                            exAlternativo.GetType().Name, exAlternativo.Message, exAlternativo.HResult);
+                    }
+
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
                         $"No se pudo cargar el certificado: {ex.Message}");
                 }
