@@ -160,98 +160,28 @@ public sealed class ProveedorCertificadoServicio(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     Path.GetTempPath());
 
-                // Punto de falla frecuente al cambiar de entorno: EphemeralKeySet + el proveedor de
-                // criptografía difieren entre Windows (dev) y Linux (p.ej. Azure App Service Linux), y un
-                // .pfx corrupto/con clave incorrecta también revienta acá con CryptographicException — antes
-                // no había forma de distinguir estos casos del resto de la cadena sin loguear el tipo real
-                // de excepción. HResult se agrega porque el Message ("The system cannot find the file
-                // specified") es genérico y engañoso — el código real detrás puede señalar la causa exacta
-                // (p.ej. un error de perfil/CryptoAPI específico) mejor que el texto.
+                // Un solo intento, no varios encadenados — probar múltiples flags/límites en la misma
+                // request (visto antes) parece destabilizar el proceso en este entorno (Free tier): el log
+                // crudo de stdout llegó a cortarse a mitad de una línea, evidencia de que el proceso murió
+                // sin poder vaciar su buffer, no de un error .NET normal. catch (Exception), no solo
+                // CryptographicException, para no dejar escapar nada sin loguear. Cada dato en su propia
+                // línea de log (no concatenado) porque un mensaje largo en una sola línea se cortó antes en
+                // Log stream/Kudu.
                 try
                 {
                     x509 = X509CertificateLoader.LoadPkcs12(
                         pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
                 }
-                catch (CryptographicException ex)
+                catch (Exception ex)
                 {
-                    // Cada dato en su propia línea de log — el intento anterior de meter tipo+mensaje+HResult
-                    // en una sola línea salió cortado en Log stream/Kudu (mensaje largo + línea larga se
-                    // truncó a mitad de camino). Separado así, cada línea es corta y ninguna se pierde aunque
-                    // el visor tenga un límite de longitud por línea.
-                    logger.LogError("ProveedorCertificado — intento 1 (EphemeralKeySet) falló. idCertificado={IdCertificado}.", idCertificado);
-                    logger.LogError("ProveedorCertificado — intento 1 tipo excepción: {Tipo}.", ex.GetType().FullName);
-                    logger.LogError("ProveedorCertificado — intento 1 mensaje: {Mensaje}", ex.Message);
-                    logger.LogError("ProveedorCertificado — intento 1 HResult: 0x{HResult:X8}", ex.HResult);
+                    logger.LogError("ProveedorCertificado — falló al cargar el .pfx. idCertificado={IdCertificado}.", idCertificado);
+                    logger.LogError("ProveedorCertificado — tipo excepción: {Tipo}.", ex.GetType().FullName);
+                    logger.LogError("ProveedorCertificado — mensaje: {Mensaje}", ex.Message);
+                    logger.LogError("ProveedorCertificado — HResult: 0x{HResult:X8}", ex.HResult);
                     if (ex.InnerException is not null)
                     {
-                        logger.LogError("ProveedorCertificado — intento 1 InnerException tipo: {Tipo}.", ex.InnerException.GetType().FullName);
-                        logger.LogError("ProveedorCertificado — intento 1 InnerException mensaje: {Mensaje}", ex.InnerException.Message);
-                    }
-
-                    // Intento 2: mismo flags pero sin EphemeralKeySet — descarta que el flag en sí sea la causa.
-                    try
-                    {
-                        using var x509Intento2 = X509CertificateLoader.LoadPkcs12(
-                            pfxBytes, clave.Datos, X509KeyStorageFlags.Exportable);
-                        logger.LogWarning("ProveedorCertificado — intento 2 (sin EphemeralKeySet) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento2.HasPrivateKey);
-                    }
-                    catch (CryptographicException ex2)
-                    {
-                        logger.LogWarning("ProveedorCertificado — intento 2 (sin EphemeralKeySet) también falló.");
-                        logger.LogWarning("ProveedorCertificado — intento 2 tipo excepción: {Tipo}.", ex2.GetType().FullName);
-                        logger.LogWarning("ProveedorCertificado — intento 2 mensaje: {Mensaje}", ex2.Message);
-                        logger.LogWarning("ProveedorCertificado — intento 2 HResult: 0x{HResult:X8}", ex2.HResult);
-                    }
-
-                    // Intento 3: EphemeralKeySet + Pkcs12LoaderLimits.DangerousNoLimits — el archivo es un
-                    // .p12 (PKCS12, mismo formato que .pfx, la extensión no cambia nada técnicamente) con
-                    // codificación ASN.1 BER de longitud indefinida (ver "3080..." al inicio del hex crudo
-                    // logueado más arriba) — no la DER de longitud definida típica de OpenSSL. Los límites
-                    // por defecto de X509CertificateLoader (introducidos en .NET 9 como endurecimiento contra
-                    // PKCS12 maliciosos/DoS) podrían estar rechazando una estructura legítima pero atípica de
-                    // esta CA (RENIEC) antes de siquiera llegar al password. DangerousNoLimits existe
-                    // específicamente para diagnosticar/permitir este caso.
-                    try
-                    {
-                        using var x509Intento3 = X509CertificateLoader.LoadPkcs12(
-                            pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable,
-                            Pkcs12LoaderLimits.DangerousNoLimits);
-                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento3.HasPrivateKey);
-                    }
-                    catch (CryptographicException ex3)
-                    {
-                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) también falló.");
-                        logger.LogWarning("ProveedorCertificado — intento 3 tipo excepción: {Tipo}.", ex3.GetType().FullName);
-                        logger.LogWarning("ProveedorCertificado — intento 3 mensaje: {Mensaje}", ex3.Message);
-                        logger.LogWarning("ProveedorCertificado — intento 3 HResult: 0x{HResult:X8}", ex3.HResult);
-                    }
-                    catch (Exception ex3General)
-                    {
-                        // Pkcs12LoadLimitExceededException u otra no-CryptographicException también son
-                        // señal útil acá — no se descarta ningún tipo de excepción en este intento de más.
-                        logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) falló con excepción no criptográfica: {Tipo}: {Mensaje}", ex3General.GetType().FullName, ex3General.Message);
-                    }
-
-                    // Intento 4: certificado autofirmado generado EN MEMORIA acá mismo (nada descargado de
-                    // S3, nada relacionado con RENIEC/el archivo real) — se exporta a PKCS12 y se intenta
-                    // recargar de inmediato, puro round-trip local. Si esto también falla con el mismo
-                    // HResult, ya no es un problema del archivo/encoding/password en absoluto — es que este
-                    // entorno de Azure no puede importar NINGÚN PKCS12 con clave privada, sin importar su
-                    // contenido, y la causa real está en la plataforma, no en certificado.p12.
-                    try
-                    {
-                        var x509Prueba = GenerarCertificadoDev();
-                        var pfxPrueba = x509Prueba.Export(X509ContentType.Pkcs12, "prueba-temporal");
-                        using var x509Intento4 = X509CertificateLoader.LoadPkcs12(
-                            pfxPrueba, "prueba-temporal", X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
-                        logger.LogWarning("ProveedorCertificado — intento 4 (autofirmado en memoria, sin relación con S3) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento4.HasPrivateKey);
-                    }
-                    catch (CryptographicException ex4)
-                    {
-                        logger.LogWarning("ProveedorCertificado — intento 4 (autofirmado en memoria, sin relación con S3) también falló.");
-                        logger.LogWarning("ProveedorCertificado — intento 4 tipo excepción: {Tipo}.", ex4.GetType().FullName);
-                        logger.LogWarning("ProveedorCertificado — intento 4 mensaje: {Mensaje}", ex4.Message);
-                        logger.LogWarning("ProveedorCertificado — intento 4 HResult: 0x{HResult:X8}", ex4.HResult);
+                        logger.LogError("ProveedorCertificado — InnerException tipo: {Tipo}.", ex.InnerException.GetType().FullName);
+                        logger.LogError("ProveedorCertificado — InnerException mensaje: {Mensaje}", ex.InnerException.Message);
                     }
 
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
