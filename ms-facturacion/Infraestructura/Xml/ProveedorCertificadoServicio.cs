@@ -232,6 +232,28 @@ public sealed class ProveedorCertificadoServicio(
                         logger.LogWarning("ProveedorCertificado — intento 3 (DangerousNoLimits) falló con excepción no criptográfica: {Tipo}: {Mensaje}", ex3General.GetType().FullName, ex3General.Message);
                     }
 
+                    // Intento 4: certificado autofirmado generado EN MEMORIA acá mismo (nada descargado de
+                    // S3, nada relacionado con RENIEC/el archivo real) — se exporta a PKCS12 y se intenta
+                    // recargar de inmediato, puro round-trip local. Si esto también falla con el mismo
+                    // HResult, ya no es un problema del archivo/encoding/password en absoluto — es que este
+                    // entorno de Azure no puede importar NINGÚN PKCS12 con clave privada, sin importar su
+                    // contenido, y la causa real está en la plataforma, no en certificado.p12.
+                    try
+                    {
+                        var x509Prueba = GenerarCertificadoDev();
+                        var pfxPrueba = x509Prueba.Export(X509ContentType.Pkcs12, "prueba-temporal");
+                        using var x509Intento4 = X509CertificateLoader.LoadPkcs12(
+                            pfxPrueba, "prueba-temporal", X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
+                        logger.LogWarning("ProveedorCertificado — intento 4 (autofirmado en memoria, sin relación con S3) SÍ cargó. HasPrivateKey={HasPrivateKey}.", x509Intento4.HasPrivateKey);
+                    }
+                    catch (CryptographicException ex4)
+                    {
+                        logger.LogWarning("ProveedorCertificado — intento 4 (autofirmado en memoria, sin relación con S3) también falló.");
+                        logger.LogWarning("ProveedorCertificado — intento 4 tipo excepción: {Tipo}.", ex4.GetType().FullName);
+                        logger.LogWarning("ProveedorCertificado — intento 4 mensaje: {Mensaje}", ex4.Message);
+                        logger.LogWarning("ProveedorCertificado — intento 4 HResult: 0x{HResult:X8}", ex4.HResult);
+                    }
+
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
                         $"No se pudo cargar el certificado: {ex.Message}");
                 }
