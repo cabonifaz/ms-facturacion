@@ -10,6 +10,7 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.LotesDocumento;
 /// ticket ES el resultado esperable de éxito). Depende solo de Puertos, nunca de otros Casos de Uso.
 public sealed class EnviarComunicacionBajaASunatCasoDeUso(
     ILoteDocumentoRepositorio loteRepositorio,
+    IDocumentoElectronicoRepositorio documentoRepositorio,
     IEmpresaRepositorio empresaRepositorio,
     IConfiguracionFacturacionEmpresaRepositorio configuracionRepositorio,
     ICredencialInquilinoRepositorio credencialRepositorio,
@@ -125,6 +126,19 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
 
         await loteRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, lote.Datos.Cabecera.IdLoteDocumento, EstadoMaestroCodigo.TicketRecibido, envio.Datos, null, null, cancellationToken);
+
+        // El lote ya refleja TicketRecibido, pero DOCUMENTOS_ELECTRONICOS.EstadoCodigo — lo que en
+        // realidad lee el listado de facturas (SP_DocumentoElectronico_ListarParaPedidoFactura) — se
+        // quedaba en Aceptado durante toda la ventana de espera de SUNAT, sin reflejar que hay una
+        // Comunicación de Baja en curso. ComunicacionBajaEnviada existe en el catálogo (TABLA_MAESTRA
+        // IdMaestro=1, Num1=6) justo para esto; faltaba aplicarla acá.
+        var fechaActualizacion = RelojPeru.Ahora();
+        foreach (var item in lote.Datos.Items)
+        {
+            await documentoRepositorio.ActualizarEstadoSunatAsync(
+                UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.ComunicacionBajaEnviada,
+                null, null, null, null, fechaActualizacion, cancellationToken);
+        }
 
         var resultado = new LoteDocumentoCreado(
             lote.Datos.Cabecera.IdLoteDocumento, lote.Datos.Cabecera.Nombre, "TicketRecibido", lote.Datos.Cabecera.FechaGeneracion);
