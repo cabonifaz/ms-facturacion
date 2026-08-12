@@ -12,5 +12,5 @@ public sealed class ActualizarEstadoSunatDocumentoElectronicoCasoDeUso(IDocument
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, CancellationToken cancellationToken) =>
         repositorio.ActualizarEstadoSunatAsync(
             usuarioEjecutor, idInquilino, idDocumentoElectronico, estadoCodigo, sunatHash,
-            sunatCodigoRespuesta, sunatDescripcionRespuesta, sunatTicket, cancellationToken);
+            sunatCodigoRespuesta, sunatDescripcionRespuesta, sunatTicket, RelojPeru.Ahora(), cancellationToken);
 }

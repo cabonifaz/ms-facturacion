@@ -105,7 +105,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         // El borrador guarda una FechaEmision/HoraEmision inicial, pero la emisión real ocurre recién
         // ahora — se recalcula al momento de confirmar, no al guardar.
-        var ahora = DateTime.Now;
+        var ahora = RelojPeru.Ahora();
         var actualizacionFecha = await documentoRepositorio.ActualizarFechaEmisionAsync(
             UsuarioWorker, idInquilino, idDocumentoElectronico,
             DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), cancellationToken);
@@ -291,7 +291,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         await documentoRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo,
             sunatHash, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
-            cancellationToken);
+            RelojPeru.Ahora(), cancellationToken);
 
         logger.LogInformation(
             "EnviarASunat — fin. idDocumentoElectronico={IdDocumentoElectronico}, estadoCodigo={EstadoCodigo}.",
