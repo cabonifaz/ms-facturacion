@@ -29,14 +29,6 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
 
-// Application Insights — captura todo lo que ya pasa por ILogger (todos los logger.LogInformation/Warning/
-// Error de este proyecto) sin cambiar ni un log existente, más las excepciones no controladas y las
-// dependencias (SQL/HTTP/S3) automáticamente. No requiere connection string acá: si el App Service tiene
-// Application Insights vinculado desde el Portal, Azure inyecta APPLICATIONINSIGHTS_CONNECTION_STRING como
-// App Setting solo y esto lo toma automáticamente — sin esa vinculación, esta llamada no hace nada (no
-// rompe nada en Development/local sin App Insights configurado).
-builder.Services.AddApplicationInsightsTelemetry();
-
 // AWS S3 — mismo patrón de conexión que maximlian3_backend/SafetyReport.WebApi/Program.cs:
 // credenciales estáticas (AWS:AccessKey/AWS:SecretKey) + región (AWS:Region), un solo IAmazonS3 singleton.
 var awsRegion = builder.Configuration["AWS:Region"]
