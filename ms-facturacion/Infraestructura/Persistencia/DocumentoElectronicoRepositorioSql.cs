@@ -154,7 +154,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 FechaAceptacion = LeerNullableDateTime(lector, "FechaAceptacion"),
                 FechaRechazo = LeerNullableDateTime(lector, "FechaRechazo"),
                 FechaAnulacion = LeerNullableDateTime(lector, "FechaAnulacion"),
-                EstadoAnulacionCodigo = LeerNullableString(lector, "EstadoAnulacionCodigo"),
                 FchCre = lector.GetDateTime(lector.GetOrdinal("FchCre"))
             };
 
@@ -369,7 +368,6 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 LeerNullableDateTime(lector, "FechaAceptacion"),
                 LeerNullableDateTime(lector, "FechaRechazo"),
                 LeerNullableDateTime(lector, "FechaAnulacion"),
-                LeerNullableString(lector, "EstadoAnulacionCodigo"),
                 lector.GetDateTime(lector.GetOrdinal("FchCre")));
 
             // Result set 3: líneas

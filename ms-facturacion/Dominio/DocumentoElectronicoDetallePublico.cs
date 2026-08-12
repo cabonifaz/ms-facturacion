@@ -18,7 +18,7 @@ public sealed record DocumentoElectronicoPublico(
     decimal TotalGravado, decimal TotalInafecto, decimal TotalExonerado, decimal TotalExportacion, decimal TotalIgv,
     decimal TotalIsc, decimal TotalOtrosTributos, decimal TotalDescuento, decimal TotalCargo, decimal TotalImporte,
     string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta,
-    DateTime? FechaAceptacion, DateTime? FechaRechazo, DateTime? FechaAnulacion, string? EstadoAnulacionCodigo, DateTime FchCre);
+    DateTime? FechaAceptacion, DateTime? FechaRechazo, DateTime? FechaAnulacion, DateTime FchCre);
 
 public sealed record LineaDocumentoElectronicoPublica(
     int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, string UnidadMedidaCodigo,
