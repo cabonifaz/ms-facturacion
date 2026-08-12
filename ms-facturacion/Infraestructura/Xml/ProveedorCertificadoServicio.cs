@@ -160,32 +160,54 @@ public sealed class ProveedorCertificadoServicio(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     Path.GetTempPath());
 
-                // Un solo intento, no varios encadenados — probar múltiples flags/límites en la misma
-                // request (visto antes) parece destabilizar el proceso en este entorno (Free tier): el log
-                // crudo de stdout llegó a cortarse a mitad de una línea, evidencia de que el proceso murió
-                // sin poder vaciar su buffer, no de un error .NET normal. catch (Exception), no solo
-                // CryptographicException, para no dejar escapar nada sin loguear. Cada dato en su propia
-                // línea de log (no concatenado) porque un mensaje largo en una sola línea se cortó antes en
-                // Log stream/Kudu.
-                try
+                // Application Insights ya demostró ser un canal de log estable (no se corta a mitad de
+                // línea), así que ahora sí se puede reintentar con distintos X509KeyStorageFlags dentro de
+                // la misma request sin repetir el riesgo de inestabilidad visto antes con 4 intentos
+                // encadenados (que además mezclaban otras cosas: DangerousNoLimits, round-trip autofirmado).
+                // Acá son solo 3 intentos, todos la misma llamada nativa, variando únicamente el flag de
+                // almacenamiento de la clave — MachineKeySet y UserKeySet fuerzan a Windows a materializar
+                // la clave en un contenedor de clave real (en vez de dejarlo resolver un backing store
+                // efímero por su cuenta), lo que puede evitar el HResult 0x80070002 si esa resolución
+                // efímera es la que está fallando en el sandbox de Preprod. Ninguno pide Exportable — el
+                // firmador solo necesita acceso a la clave privada, no exportarla.
+                var intentos = new (string Nombre, X509KeyStorageFlags Flags)[]
                 {
-                    x509 = X509CertificateLoader.LoadPkcs12(
-                        pfxBytes, clave.Datos, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable);
-                }
-                catch (Exception ex)
+                    ("MachineKeySet", X509KeyStorageFlags.MachineKeySet),
+                    ("UserKeySet", X509KeyStorageFlags.UserKeySet),
+                    ("EphemeralKeySet", X509KeyStorageFlags.EphemeralKeySet),
+                };
+
+                Exception? ultimoError = null;
+                x509 = null!;
+                foreach (var (nombre, flags) in intentos)
                 {
-                    logger.LogError("ProveedorCertificado — falló al cargar el .pfx. idCertificado={IdCertificado}.", idCertificado);
-                    logger.LogError("ProveedorCertificado — tipo excepción: {Tipo}.", ex.GetType().FullName);
-                    logger.LogError("ProveedorCertificado — mensaje: {Mensaje}", ex.Message);
-                    logger.LogError("ProveedorCertificado — HResult: 0x{HResult:X8}", ex.HResult);
-                    if (ex.InnerException is not null)
+                    try
                     {
-                        logger.LogError("ProveedorCertificado — InnerException tipo: {Tipo}.", ex.InnerException.GetType().FullName);
-                        logger.LogError("ProveedorCertificado — InnerException mensaje: {Mensaje}", ex.InnerException.Message);
+                        x509 = X509CertificateLoader.LoadPkcs12(pfxBytes, clave.Datos, flags);
+                        logger.LogWarning("ProveedorCertificado — LoadPkcs12 exitoso con flag={Flag}.", nombre);
+                        ultimoError = null;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        ultimoError = ex;
+                        logger.LogError("ProveedorCertificado — falló LoadPkcs12 con flag={Flag}. tipo={Tipo}, mensaje={Mensaje}, HResult=0x{HResult:X8}.",
+                            nombre, ex.GetType().FullName, ex.Message, ex.HResult);
+                    }
+                }
+
+                if (ultimoError is not null)
+                {
+                    logger.LogError("ProveedorCertificado — falló al cargar el .pfx con los {Cantidad} flags probados. idCertificado={IdCertificado}.",
+                        intentos.Length, idCertificado);
+                    if (ultimoError.InnerException is not null)
+                    {
+                        logger.LogError("ProveedorCertificado — InnerException tipo: {Tipo}.", ultimoError.InnerException.GetType().FullName);
+                        logger.LogError("ProveedorCertificado — InnerException mensaje: {Mensaje}", ultimoError.InnerException.Message);
                     }
 
                     return ResultadoOperacion<X509Certificate2>.DeErrorSistema(
-                        $"No se pudo cargar el certificado: {ex.Message}");
+                        $"No se pudo cargar el certificado: {ultimoError.Message}");
                 }
 
                 // Confirma que el .pfx descargado de S3 (no uno de caché ni el autofirmado de dev) es
