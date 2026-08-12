@@ -61,7 +61,6 @@ public sealed class DocumentoElectronico
     public DateTime? FechaAceptacion { get; init; }
     public DateTime? FechaRechazo { get; init; }
     public DateTime? FechaAnulacion { get; init; }
-    public string? EstadoAnulacionCodigo { get; init; }
 
     public required DateTime FchCre { get; init; }
 }
