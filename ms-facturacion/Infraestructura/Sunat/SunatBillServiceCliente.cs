@@ -84,6 +84,10 @@ public sealed class SunatBillServiceCliente(
             // la llamada de red más probable de fallar de forma diferente que en local — sin esto no había
             // forma de ver el tipo real de excepción (HttpRequestException/TaskCanceledException por
             // timeout/AuthenticationException por TLS/etc.) ni su InnerException.
+            // DeErrorSistema queda reservado exactamente para este caso — nunca llegamos a tener una
+            // respuesta de SUNAT (ni exitosa ni con fault), así que EnviarDocumentoElectronicoASunatCasoDeUso
+            // no toca el documento: se queda en PendienteEnvio, no en ErrorSunat, porque no es un hecho
+            // sobre el documento — es un problema de nuestro propio código/infraestructura/red.
             logger.LogError(ex, "sendBill — excepción no controlada al llamar a {Url}.", url);
             return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(ex.Message);
         }
@@ -125,7 +129,11 @@ public sealed class SunatBillServiceCliente(
 
         if (string.IsNullOrWhiteSpace(applicationResponseBase64))
         {
-            return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(
+            // DeReglaDeNegocio, no DeErrorSistema — SUNAT sí respondió (llegamos hasta acá), solo que sin
+            // un CDR usable. EnviarDocumentoElectronicoASunatCasoDeUso distingue por este TipoMensaje si
+            // marca el documento ErrorSunat (llegó a SUNAT) o lo deja en PendienteEnvio (nunca llegó,
+            // ver el catch de EnviarAsync) — DeErrorSistema queda reservado solo para ese segundo caso.
+            return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                 "La respuesta de SUNAT no contiene 'applicationResponse'.");
         }
 
