@@ -69,23 +69,6 @@ public sealed class ProveedorCertificadoServicio(
 
             var pfxBytes = await DescargarDeS3Async(certificado.Datos.RutaAlmacenamiento, cancellationToken);
 
-            logger.LogInformation(
-                "ProveedorCertificado — resultado de la descarga S3. clave={Clave}, encontrado={Encontrado}, bytes={Bytes}.",
-                certificado.Datos.RutaAlmacenamiento, pfxBytes is not null, pfxBytes?.Length ?? 0);
-
-            // Log crudo: primeros/últimos bytes en hex del .pfx tal cual llegó de S3 — un PKCS12 válido
-            // arranca con la secuencia ASN.1 "30" (SEQUENCE); si en Azure llegara distinto a lo que se ve
-            // acá o distinto de lo descargado en la prueba local, sería evidencia de que el archivo se
-            // corrompe en tránsito (proxy/encoding), no un problema de contraseña.
-            if (pfxBytes is not null)
-            {
-                var prefijo = Convert.ToHexString(pfxBytes.AsSpan(0, Math.Min(32, pfxBytes.Length)));
-                var sufijo = Convert.ToHexString(pfxBytes.AsSpan(Math.Max(0, pfxBytes.Length - 16)));
-                logger.LogWarning(
-                    "ProveedorCertificado — .pfx crudo: bytes={Bytes}, primeros32Hex={Prefijo}, ultimos16Hex={Sufijo}.",
-                    pfxBytes.Length, prefijo, sufijo);
-            }
-
             X509Certificate2 x509;
 
             if (entorno.IsDevelopment() && pfxBytes is null)
@@ -106,10 +89,6 @@ public sealed class ProveedorCertificadoServicio(
                         $"No se encontró el certificado en S3: {certificado.Datos.RutaAlmacenamiento}.");
                 }
 
-                logger.LogInformation(
-                    "ProveedorCertificado — buscando credencial {TipoCredencial} (idInquilino={IdInquilino}, idEmpresa={IdEmpresa}).",
-                    TipoCredencialClaveCertificado, idInquilino, idEmpresa);
-
                 var credencial = await credencialRepositorio.ObtenerPorTipoAsync(
                     idInquilino, idEmpresa, TipoCredencialClaveCertificado, cancellationToken);
                 if (credencial.IdTipoMensaje != TipoMensaje.Exito || credencial.Datos is null)
@@ -120,14 +99,6 @@ public sealed class ProveedorCertificadoServicio(
                     return new ResultadoOperacion<X509Certificate2>(credencial.IdTipoMensaje, credencial.Mensaje, default);
                 }
 
-                // Log crudo de lo que efectivamente se lee de CREDENCIALES_INQUILINO antes de intentar
-                // descifrarlo — hex completo (son pocos bytes: ValorCifrado suele ser tan largo como la
-                // contraseña, Nonce=12, Tag=16), para poder reproducir el descifrado exacto fuera de la app
-                // si algo falla, igual que se hizo manualmente para diagnosticar este mismo problema antes.
-                logger.LogWarning(
-                    "ProveedorCertificado — credencial cruda: valorCifradoHex={ValorCifradoHex}, nonceHex={NonceHex}, tagHex={TagHex}.",
-                    Convert.ToHexString(credencial.Datos.ValorCifrado), Convert.ToHexString(credencial.Datos.Nonce), Convert.ToHexString(credencial.Datos.Tag));
-
                 var clave = await cifradoServicio.DescifrarAsync(
                     idInquilino, credencial.Datos.ValorCifrado, credencial.Datos.Nonce, credencial.Datos.Tag, cancellationToken);
                 if (clave.IdTipoMensaje != TipoMensaje.Exito || clave.Datos is null)
@@ -136,46 +107,29 @@ public sealed class ProveedorCertificadoServicio(
                     return new ResultadoOperacion<X509Certificate2>(clave.IdTipoMensaje, clave.Mensaje, default);
                 }
 
-                // Log crudo del resultado descifrado — bytes UTF8 en hex (no el texto plano en claro) más
-                // longitud en caracteres, para poder comparar byte a byte contra una prueba local sin tener
-                // que loguear la contraseña real en texto.
-                var claveBytesUtf8 = System.Text.Encoding.UTF8.GetBytes(clave.Datos);
-                logger.LogWarning(
-                    "ProveedorCertificado — clave descifrada: longitudCaracteres={LongitudCaracteres}, bytesUtf8Hex={BytesUtf8Hex}.",
-                    clave.Datos.Length, Convert.ToHexString(claveBytesUtf8));
-
-                // Diagnóstico previo al intento: si WEBSITE_LOAD_USER_PROFILE realmente cargó un perfil de
-                // usuario real para este proceso, ApplicationData/UserProfile deberían resolver a una ruta
-                // real (algo bajo C:\Windows\system32\config\systemprofile o similar en el sandbox de Azure
-                // sin perfil, vs. una ruta de usuario real si el setting funcionó). Se loguea antes del
-                // intento porque si LoadPkcs12 falla, igual queremos ver esto — no depende de si la carga
-                // tuvo éxito o no.
-                logger.LogWarning(
-                    "ProveedorCertificado — diagnóstico de entorno antes de cargar el .pfx: usuario={Usuario}, " +
-                    "ApplicationData='{ApplicationData}', UserProfile='{UserProfile}', LocalApplicationData='{LocalApplicationData}', " +
-                    "TEMP={Temp}.",
-                    Environment.UserName,
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    Path.GetTempPath());
-
-                // Application Insights ya demostró ser un canal de log estable (no se corta a mitad de
-                // línea), así que ahora sí se puede reintentar con distintos X509KeyStorageFlags dentro de
-                // la misma request sin repetir el riesgo de inestabilidad visto antes con 4 intentos
-                // encadenados (que además mezclaban otras cosas: DangerousNoLimits, round-trip autofirmado).
-                // Acá son solo 3 intentos, todos la misma llamada nativa, variando únicamente el flag de
-                // almacenamiento de la clave — MachineKeySet y UserKeySet fuerzan a Windows a materializar
-                // la clave en un contenedor de clave real (en vez de dejarlo resolver un backing store
-                // efímero por su cuenta), lo que puede evitar el HResult 0x80070002 si esa resolución
-                // efímera es la que está fallando en el sandbox de Preprod. Ninguno pide Exportable — el
-                // firmador solo necesita acceso a la clave privada, no exportarla.
-                var intentos = new (string Nombre, X509KeyStorageFlags Flags)[]
-                {
-                    ("MachineKeySet", X509KeyStorageFlags.MachineKeySet),
-                    ("UserKeySet", X509KeyStorageFlags.UserKeySet),
-                    ("EphemeralKeySet", X509KeyStorageFlags.EphemeralKeySet),
-                };
+                // X509KeyStorageFlags es un concepto de Windows CAPI/CNG (contenedores de clave con nombre).
+                // En Unix, X509CertificateLoader va sobre OpenSSL, que no tiene ese almacén — los 3 flags son
+                // no-op ahí (la clave siempre se materializa en memoria, vía EVP_PKEY), así que encadenar los
+                // 3 intentos no cambia nada, solo agrega ruido de log. OperatingSystem.IsWindows() detecta el
+                // SO real del proceso en ejecución (no dónde se compiló) — este mismo código corre tanto en
+                // Windows (desarrollo local) como en Linux (AWS, destino de producción).
+                //
+                // En Windows: MachineKeySet y UserKeySet fuerzan a materializar la clave en un contenedor de
+                // clave real (en vez de dejar que Windows resuelva un backing store efímero por su cuenta),
+                // lo que evita el HResult 0x80070002 visto en Azure App Service — la resolución de clave
+                // efímera está bloqueada en ese sandbox específicamente (ver investigación previa). Ninguno
+                // pide Exportable — el firmador solo necesita acceso a la clave privada, no exportarla.
+                var intentos = OperatingSystem.IsWindows()
+                    ? new (string Nombre, X509KeyStorageFlags Flags)[]
+                      {
+                          ("MachineKeySet", X509KeyStorageFlags.MachineKeySet),
+                          ("UserKeySet", X509KeyStorageFlags.UserKeySet),
+                          ("EphemeralKeySet", X509KeyStorageFlags.EphemeralKeySet),
+                      }
+                    : new (string Nombre, X509KeyStorageFlags Flags)[]
+                      {
+                          ("EphemeralKeySet", X509KeyStorageFlags.EphemeralKeySet),
+                      };
 
                 Exception? ultimoError = null;
                 x509 = null!;
@@ -184,7 +138,6 @@ public sealed class ProveedorCertificadoServicio(
                     try
                     {
                         x509 = X509CertificateLoader.LoadPkcs12(pfxBytes, clave.Datos, flags);
-                        logger.LogWarning("ProveedorCertificado — LoadPkcs12 exitoso con flag={Flag}.", nombre);
                         ultimoError = null;
                         break;
                     }
