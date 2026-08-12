@@ -121,12 +121,13 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
 
         var esAceptado = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.ComunicacionBajaAceptada;
         var severidad = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.Rechazado ? "Error" : "Advertencia";
+        var ahora = RelojPeru.Ahora();
 
         foreach (var item in lote.Datos.Items)
         {
             await documentoRepositorio.ActualizarEstadoSunatAsync(
                 UsuarioWorker, idInquilino, item.IdDocumentoElectronico, consulta.Datos.EstadoCodigo,
-                null, consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, null, cancellationToken);
+                null, consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, null, ahora, cancellationToken);
 
             if (!esAceptado)
             {

@@ -6,7 +6,7 @@ namespace ms_facturacion.Aplicacion.Puertos;
 public interface ILoteDocumentoRepositorio
 {
     Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
         IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<LoteDocumentoDetalle>> ObtenerAsync(

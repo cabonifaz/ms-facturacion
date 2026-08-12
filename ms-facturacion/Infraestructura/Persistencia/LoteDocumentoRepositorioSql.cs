@@ -14,7 +14,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         ?? throw new InvalidOperationException("No se configuró la cadena de conexión 'MsFacturacion'.");
 
     public async Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
         IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken)
     {
         try
@@ -26,6 +26,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
             comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
             var tabla = new DataTable();
             tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
