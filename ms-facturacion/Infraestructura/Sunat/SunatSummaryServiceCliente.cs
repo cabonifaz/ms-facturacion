@@ -47,7 +47,12 @@ public sealed class SunatSummaryServiceCliente(
 
             if (string.IsNullOrWhiteSpace(ticket))
             {
-                return ResultadoOperacion<string>.DeErrorSistema("La respuesta de SUNAT no contiene 'ticket'.");
+                // DeReglaDeNegocio, no DeErrorSistema — SUNAT sí respondió (pasamos el chequeo de cuerpo nulo
+                // y de faultString), solo que sin 'ticket'. Mismo criterio que SunatBillServiceCliente:
+                // DeErrorSistema queda reservado para cuando nunca hubo respuesta de SUNAT (ver el catch de
+                // acá abajo y el "cuerpoRespuesta is null" más arriba), para que EnviarComunicacionBajaASunatCasoDeUso
+                // pueda distinguir "nunca llegamos a SUNAT" de "SUNAT respondió mal" por este TipoMensaje.
+                return ResultadoOperacion<string>.DeReglaDeNegocio("La respuesta de SUNAT no contiene 'ticket'.");
             }
 
             return ResultadoOperacion<string>.DeExito("SUNAT recibió la comunicación, en proceso.", ticket);
@@ -130,8 +135,11 @@ public sealed class SunatSummaryServiceCliente(
         }
     }
 
-    /// Comunicación de baja aceptada usa su propio estado terminal (ComunicacionBajaAceptada) en vez de
-    /// "Aceptado" — mismo mapeo de rangos que sendBill (0/2000-3999/4000+, ver payload_input_output_sunat.md §2.3).
+    /// Comunicación de baja aceptada/rechazada usa sus propios estados terminales (ComunicacionBajaAceptada/
+    /// ComunicacionBajaRechazada) en vez de "Aceptado"/"Rechazado" — esos ya significan "el documento en sí
+    /// fue aceptado/rechazado por SUNAT", algo distinto de "la solicitud de anularlo fue aceptada/rechazada"
+    /// (el documento sigue siendo válido si la baja es rechazada). Mismo mapeo de rangos que sendBill
+    /// (0/2000-3999/4000+, ver payload_input_output_sunat.md §2.3).
     private static EstadoMaestroCodigo MapearEstadoCodigo(string codigoRespuesta)
     {
         if (codigoRespuesta == "0")
@@ -143,7 +151,7 @@ public sealed class SunatSummaryServiceCliente(
         {
             if (codigo is >= 2000 and <= 3999)
             {
-                return EstadoMaestroCodigo.Rechazado;
+                return EstadoMaestroCodigo.ComunicacionBajaRechazada;
             }
 
             if (codigo >= 4000)
@@ -152,7 +160,7 @@ public sealed class SunatSummaryServiceCliente(
             }
         }
 
-        return EstadoMaestroCodigo.Rechazado;
+        return EstadoMaestroCodigo.ComunicacionBajaRechazada;
     }
 
     private static XDocument ConstruirSobre(string usuarioSolCompleto, string claveSol, XElement cuerpoOperacion) =>

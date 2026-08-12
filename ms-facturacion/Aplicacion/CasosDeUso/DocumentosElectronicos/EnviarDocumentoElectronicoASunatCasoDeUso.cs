@@ -234,8 +234,26 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat(EstadoMaestroCodigo.Error, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
+
+            // ReglaDeNegocio = SUNAT sí respondió, solo que sin CDR usable (fault, HTTP de error, respuesta
+            // sin applicationResponse) — eso es un hecho real sobre el documento, se marca ErrorSunat.
+            // ErrorSistema = nunca hubo respuesta de SUNAT (ver el catch de SunatBillServiceCliente.EnviarAsync:
+            // excepción de red/TLS/DNS antes de completar el request-response). Eso es un problema de
+            // nuestro propio código/infraestructura, no un hecho sobre el documento — se deja en
+            // PendienteEnvio para reintentar sin necesidad de "recuperarse" de nada.
+            if (envio.IdTipoMensaje == TipoMensaje.ReglaDeNegocio)
+            {
+                await documentoRepositorio.ActualizarEstadoSunatAsync(
+                    UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, EstadoMaestroCodigo.ErrorSunat,
+                    null, null, envio.Mensaje, null, RelojPeru.Ahora(), cancellationToken);
+
+                await errorRepositorio.InsertarAsync(
+                    UsuarioWorker, idInquilino,
+                    new ErrorDocumento(cabecera.IdDocumentoElectronico, transmision.Datos, "Sunat", string.Empty, envio.Mensaje, null, "Error"),
+                    cancellationToken);
+            }
 
             return new ResultadoOperacion<ResultadoEnvioSunat>(envio.IdTipoMensaje, envio.Mensaje, default);
         }

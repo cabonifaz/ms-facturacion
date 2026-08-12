@@ -13,9 +13,11 @@ public enum EstadoMaestroCodigo
     Rechazado = 5,
     ComunicacionBajaEnviada = 6,
     ComunicacionBajaAceptada = 7,
-    Error = 8,
+    ErrorSunat = 8,
     TicketRecibido = 9,
     TicketPendiente = 10,
     ConsultandoTicket = 11,
-    TicketConError = 12
+    TicketConError = 12,
+    ComunicacionBajaRechazada = 13,
+    ComunicacionBajaConError = 14
 }
