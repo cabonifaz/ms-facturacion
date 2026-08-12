@@ -22,7 +22,9 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
     IAlmacenamientoArchivosServicio almacenamiento,
     IArchivoDocumentoRepositorio archivoRepositorio,
     ITransmisionSunatRepositorio transmisionRepositorio,
-    ISunatSummaryServiceCliente sunatCliente)
+    ISunatSummaryServiceCliente sunatCliente,
+    IItemLoteDocumentoRepositorio itemRepositorio,
+    IErrorDocumentoRepositorio errorRepositorio)
 {
     private const string UsuarioWorker = "ms-facturacion-worker";
 
@@ -113,8 +115,35 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         {
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat(EstadoMaestroCodigo.Error, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
+
+            // ReglaDeNegocio = SUNAT sí respondió al sendSummary, solo que sin ticket usable — un fallo real,
+            // igual que el branch de TicketConError en ConsultarTicketComunicacionBajaCasoDeUso: se marca el
+            // lote, cada documento (ComunicacionBajaConError) y se deja un registro en ERRORES_DOCUMENTO.
+            // ErrorSistema = nunca hubo respuesta de SUNAT (ver el catch de SunatSummaryServiceCliente.EnviarAsync)
+            // — no es un hecho sobre el documento ni sobre la baja en sí, así que el lote se deja en
+            // PendienteEnvio (su estado de inserción) en vez de TicketConError, y ningún documento se toca.
+            if (envio.IdTipoMensaje == TipoMensaje.ReglaDeNegocio)
+            {
+                await loteRepositorio.ActualizarEstadoSunatAsync(
+                    UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, null, envio.IdTipoMensaje.ToString(), envio.Mensaje, cancellationToken);
+                await itemRepositorio.ActualizarEstadoSunatTodosAsync(
+                    UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, null, null, cancellationToken);
+
+                var ahoraError = RelojPeru.Ahora();
+                foreach (var item in lote.Datos.Items)
+                {
+                    await documentoRepositorio.ActualizarEstadoSunatAsync(
+                        UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.ComunicacionBajaConError,
+                        null, null, null, null, ahoraError, cancellationToken);
+
+                    await errorRepositorio.InsertarAsync(
+                        UsuarioWorker, idInquilino,
+                        new ErrorDocumento(item.IdDocumentoElectronico, transmision.Datos, "Sunat", string.Empty, envio.Mensaje, null, "Error"),
+                        cancellationToken);
+                }
+            }
 
             return new ResultadoOperacion<LoteDocumentoCreado>(envio.IdTipoMensaje, envio.Mensaje, default);
         }

@@ -47,7 +47,12 @@ public sealed class SunatSummaryServiceCliente(
 
             if (string.IsNullOrWhiteSpace(ticket))
             {
-                return ResultadoOperacion<string>.DeErrorSistema("La respuesta de SUNAT no contiene 'ticket'.");
+                // DeReglaDeNegocio, no DeErrorSistema — SUNAT sí respondió (pasamos el chequeo de cuerpo nulo
+                // y de faultString), solo que sin 'ticket'. Mismo criterio que SunatBillServiceCliente:
+                // DeErrorSistema queda reservado para cuando nunca hubo respuesta de SUNAT (ver el catch de
+                // acá abajo y el "cuerpoRespuesta is null" más arriba), para que EnviarComunicacionBajaASunatCasoDeUso
+                // pueda distinguir "nunca llegamos a SUNAT" de "SUNAT respondió mal" por este TipoMensaje.
+                return ResultadoOperacion<string>.DeReglaDeNegocio("La respuesta de SUNAT no contiene 'ticket'.");
             }
 
             return ResultadoOperacion<string>.DeExito("SUNAT recibió la comunicación, en proceso.", ticket);

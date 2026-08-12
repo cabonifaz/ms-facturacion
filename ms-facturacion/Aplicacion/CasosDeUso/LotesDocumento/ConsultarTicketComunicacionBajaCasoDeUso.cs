@@ -99,7 +99,9 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         // 99: error técnico de SUNAT al procesar el ticket, sin CDR utilizable. El documento había quedado
         // en ComunicacionBajaEnviada al enviar la baja (ver EnviarComunicacionBajaASunatCasoDeUso) — sin
         // este paso se quedaría ahí para siempre, mostrando "en curso" indefinidamente aunque el intento
-        // ya terminó en error.
+        // ya terminó en error. ComunicacionBajaConError (no el genérico Error) porque este SP ahora separa
+        // EstadoAnulacionCodigo de EstadoCodigo — Error significa "la emisión nunca llegó a SUNAT", algo
+        // completamente distinto de "la baja de un documento ya aceptado falló al consultar el ticket".
         if (consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.TicketConError)
         {
             await loteRepositorio.ActualizarEstadoSunatAsync(
@@ -111,8 +113,19 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             foreach (var item in lote.Datos.Items)
             {
                 await documentoRepositorio.ActualizarEstadoSunatAsync(
-                    UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.Error,
+                    UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.ComunicacionBajaConError,
                     null, null, null, null, ahoraError, cancellationToken);
+
+                // Mismo criterio que el branch de abajo (statusCode 0, Rechazada) — ComunicacionBajaConError
+                // es un fallo real (el ticket nunca se resolvió), no debía quedar sin registro en
+                // ERRORES_DOCUMENTO solo porque no vino de un CDR.
+                await errorRepositorio.InsertarAsync(
+                    UsuarioWorker, idInquilino,
+                    new ErrorDocumento(
+                        item.IdDocumentoElectronico, null, "Sunat",
+                        consulta.Datos.SunatCodigoRespuesta ?? string.Empty, consulta.Mensaje,
+                        null, "Error"),
+                    cancellationToken);
             }
 
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
