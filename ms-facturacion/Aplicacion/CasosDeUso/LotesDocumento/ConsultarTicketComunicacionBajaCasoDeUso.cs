@@ -96,13 +96,24 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
         }
 
-        // 99: error técnico de SUNAT al procesar el ticket, sin CDR utilizable.
+        // 99: error técnico de SUNAT al procesar el ticket, sin CDR utilizable. El documento había quedado
+        // en ComunicacionBajaEnviada al enviar la baja (ver EnviarComunicacionBajaASunatCasoDeUso) — sin
+        // este paso se quedaría ahí para siempre, mostrando "en curso" indefinidamente aunque el intento
+        // ya terminó en error.
         if (consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.TicketConError)
         {
             await loteRepositorio.ActualizarEstadoSunatAsync(
                 UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, cabecera.Ticket, null, null, cancellationToken);
             await itemRepositorio.ActualizarEstadoSunatTodosAsync(
                 UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, null, null, cancellationToken);
+
+            var ahoraError = RelojPeru.Ahora();
+            foreach (var item in lote.Datos.Items)
+            {
+                await documentoRepositorio.ActualizarEstadoSunatAsync(
+                    UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.Error,
+                    null, null, null, null, ahoraError, cancellationToken);
+            }
 
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
         }
@@ -120,7 +131,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, cancellationToken);
 
         var esAceptado = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.ComunicacionBajaAceptada;
-        var severidad = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.Rechazado ? "Error" : "Advertencia";
+        var severidad = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.ComunicacionBajaRechazada ? "Error" : "Advertencia";
         var ahora = RelojPeru.Ahora();
 
         foreach (var item in lote.Datos.Items)

@@ -130,8 +130,11 @@ public sealed class SunatSummaryServiceCliente(
         }
     }
 
-    /// Comunicación de baja aceptada usa su propio estado terminal (ComunicacionBajaAceptada) en vez de
-    /// "Aceptado" — mismo mapeo de rangos que sendBill (0/2000-3999/4000+, ver payload_input_output_sunat.md §2.3).
+    /// Comunicación de baja aceptada/rechazada usa sus propios estados terminales (ComunicacionBajaAceptada/
+    /// ComunicacionBajaRechazada) en vez de "Aceptado"/"Rechazado" — esos ya significan "el documento en sí
+    /// fue aceptado/rechazado por SUNAT", algo distinto de "la solicitud de anularlo fue aceptada/rechazada"
+    /// (el documento sigue siendo válido si la baja es rechazada). Mismo mapeo de rangos que sendBill
+    /// (0/2000-3999/4000+, ver payload_input_output_sunat.md §2.3).
     private static EstadoMaestroCodigo MapearEstadoCodigo(string codigoRespuesta)
     {
         if (codigoRespuesta == "0")
@@ -143,7 +146,7 @@ public sealed class SunatSummaryServiceCliente(
         {
             if (codigo is >= 2000 and <= 3999)
             {
-                return EstadoMaestroCodigo.Rechazado;
+                return EstadoMaestroCodigo.ComunicacionBajaRechazada;
             }
 
             if (codigo >= 4000)
@@ -152,7 +155,7 @@ public sealed class SunatSummaryServiceCliente(
             }
         }
 
-        return EstadoMaestroCodigo.Rechazado;
+        return EstadoMaestroCodigo.ComunicacionBajaRechazada;
     }
 
     private static XDocument ConstruirSobre(string usuarioSolCompleto, string claveSol, XElement cuerpoOperacion) =>
