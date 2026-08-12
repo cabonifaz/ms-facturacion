@@ -29,7 +29,8 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         int idInquilino, int idEmpresa, DateOnly fechaReferencia, IReadOnlyList<ItemBajaEntrada> items,
         string ambienteCodigo, CancellationToken cancellationToken)
     {
-        var creado = await loteRepositorio.InsertarAsync(UsuarioWorker, idInquilino, idEmpresa, fechaReferencia, items, cancellationToken);
+        var fechaGeneracion = DateOnly.FromDateTime(RelojPeru.Ahora());
+        var creado = await loteRepositorio.InsertarAsync(UsuarioWorker, idInquilino, idEmpresa, fechaReferencia, fechaGeneracion, items, cancellationToken);
         if (creado.IdTipoMensaje != TipoMensaje.Exito || creado.Datos is null)
         {
             return new ResultadoOperacion<LoteDocumentoCreado>(creado.IdTipoMensaje, creado.Mensaje, default);

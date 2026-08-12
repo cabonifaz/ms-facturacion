@@ -17,7 +17,7 @@ public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoR
         IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
     {
-        var ahora = DateTime.Now;
+        var ahora = RelojPeru.Ahora();
         return repositorio.InsertarAsync(
             usuarioEjecutor, idInquilino, idEmpresa, idExterno, numeroReferencia, idTipoDocumentoMaestro,
             DateOnly.FromDateTime(ahora), TimeOnly.FromDateTime(ahora), idMonedaMaestro, tipoCambio, idTipoOperacionMaestro, idFormaPago, cliente,
