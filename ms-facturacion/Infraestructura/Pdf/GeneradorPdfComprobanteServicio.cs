@@ -53,7 +53,8 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         }
     }
 
-    public byte[] Construir(DocumentoElectronicoDetalle documento, Empresa empresa, string codigoVerificacion, string? sunatHash)
+    public byte[] Construir(
+        DocumentoElectronicoDetalle documento, Empresa empresa, string codigoVerificacion, string? sunatHash, bool anulado = false)
     {
         var cabecera = documento.Cabecera;
 
@@ -367,9 +368,37 @@ public sealed class GeneradorPdfComprobanteServicio : IGeneradorPdfComprobanteSe
         // ===== Borde exterior de toda la tarjeta =====
         gfx.DrawRectangle(XPens.Black, margen - 6, yInicio - 6, anchoUtil + 12, y - yInicio + 12);
 
+        if (anulado)
+        {
+            DibujarMarcaAguaAnulado(gfx, pagina, cabecera.EstadoCodigo);
+        }
+
         using var salida = new MemoryStream();
         doc.Save(salida);
         return salida.ToArray();
+    }
+
+    /// Diagonal esquina inferior izquierda → esquina superior derecha — no un ángulo fijo de 45°, porque la
+    /// página no es cuadrada (A4: 210x297mm); el ángulo real de esa diagonal es Math.Atan2(alto, ancho).
+    /// Negativo porque en el sistema de coordenadas de PdfSharp/XGraphics el eje Y crece hacia abajo, así
+    /// que una rotación "hacia arriba a la derecha" es un ángulo negativo (antihorario). El texto viene de
+    /// cabecera.EstadoCodigo, no hardcodeado — a esta altura del flujo (RegenerarPdfAnuladoAsync) ya vino
+    /// resuelto por SP_DocumentoElectronico_Obtener contra TABLA_MAESTRA IdMaestro=16, así que cambiar esa
+    /// fila cambia el texto sin tocar código.
+    private static void DibujarMarcaAguaAnulado(XGraphics gfx, PdfPage pagina, string texto)
+    {
+        var ancho = pagina.Width.Point;
+        var alto = pagina.Height.Point;
+        var centro = new XPoint(ancho / 2, alto / 2);
+        var anguloGrados = -Math.Atan2(alto, ancho) * 180 / Math.PI;
+
+        var fuenteMarcaAgua = new XFont(FuenteEmbebidaResolver.NombreFamiliaBold, 80, XFontStyleEx.Regular);
+        var pincelMarcaAgua = new XSolidBrush(XColor.FromArgb(110, 200, 0, 0));
+
+        var estado = gfx.Save();
+        gfx.RotateAtTransform(anguloGrados, centro);
+        gfx.DrawString(texto.ToUpperInvariant(), fuenteMarcaAgua, pincelMarcaAgua, centro, XStringFormats.Center);
+        gfx.Restore(estado);
     }
 
     /// Se dibuja como rectángulos vectoriales (no como imagen PNG rasterizada): PdfSharp.Drawing.

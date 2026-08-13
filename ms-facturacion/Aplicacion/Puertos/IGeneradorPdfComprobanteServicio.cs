@@ -6,5 +6,6 @@ namespace ms_facturacion.Aplicacion.Puertos;
 /// SUNAT, Aspectos Técnicos) y RS 097-2012/RS 300-2014/SUNAT (contenido mínimo de la representación impresa).
 public interface IGeneradorPdfComprobanteServicio
 {
-    byte[] Construir(DocumentoElectronicoDetalle documento, Empresa empresa, string codigoVerificacion, string? sunatHash);
+    byte[] Construir(
+        DocumentoElectronicoDetalle documento, Empresa empresa, string codigoVerificacion, string? sunatHash, bool anulado = false);
 }
