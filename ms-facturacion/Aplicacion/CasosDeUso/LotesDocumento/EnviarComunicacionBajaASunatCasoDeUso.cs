@@ -93,14 +93,14 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         var idLoteDocumento = lote.Datos.Cabecera.IdLoteDocumento;
         var carpeta = $"{idInquilino}/{idEmpresa}/{fechaReferencia:yyyy}/{fechaReferencia:MM}/baja-{lote.Datos.Cabecera.Nombre}";
         var nombreAlmacenamiento = $"{lote.Datos.Cabecera.Nombre}-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        await GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
+        var idArchivoXml = await GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
         var idArchivoZip = await GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
 
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
         var nuevaTransmision = new NuevaTransmisionSunat(
             null, idLoteDocumento, configuracion.Datos.TipoProveedorCodigo, configuracion.Datos.UrlEnvioFacturaBoletaNota,
-            "sendSummary", idArchivoZip, 1);
+            "sendSummary", idArchivoZip, 1, idArchivoXml);
 
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)

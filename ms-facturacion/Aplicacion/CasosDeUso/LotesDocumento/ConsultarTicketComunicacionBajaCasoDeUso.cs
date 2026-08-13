@@ -20,7 +20,8 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     IAlmacenamientoArchivosServicio almacenamiento,
     IArchivoDocumentoRepositorio archivoRepositorio,
     ISunatSummaryServiceCliente sunatCliente,
-    IErrorDocumentoRepositorio errorRepositorio)
+    IErrorDocumentoRepositorio errorRepositorio,
+    IGeneradorPdfComprobanteServicio generadorPdf)
 {
     private const string UsuarioWorker = "ms-facturacion-worker";
 
@@ -163,6 +164,10 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
                         null, severidad),
                     cancellationToken);
             }
+            else
+            {
+                await RegenerarPdfAnuladoAsync(idInquilino, idLoteDocumento, item.IdDocumentoElectronico, carpeta, empresa.Datos, cancellationToken);
+            }
         }
 
         return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
@@ -176,6 +181,38 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         var hash = Convert.ToHexString(SHA256.HashData(cdrXmlBytes)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(null, idLoteDocumento, "Cdr", nombreArchivo, ruta, "application/xml", hash, cdrXmlBytes.LongLength);
+        await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+    }
+
+    // Regenera el PDF del documento ya anulado con la marca de agua "ANULADO" y lo guarda como una fila
+    // nueva de ARCHIVOS_DOCUMENTO — con IdDocumentoElectronico (para que SP_ArchivoDocumento_ObtenerXmlYPdf
+    // lo encuentre directo, sin ambigüedad si el lote incluyó más de un documento) e IdLoteDocumento (solo
+    // como rastro de auditoría de qué baja lo generó, no se usa para la búsqueda). Falla en silencio — el
+    // documento ya quedó correctamente marcado ComunicacionBajaAceptada antes de llegar acá, así que un
+    // problema al regenerar el PDF no debe tirar abajo el resultado real de la baja.
+    private async Task RegenerarPdfAnuladoAsync(
+        int idInquilino, int idLoteDocumento, int idDocumentoElectronico, string carpeta, Empresa empresa, CancellationToken cancellationToken)
+    {
+        var documento = await documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        if (documento.IdTipoMensaje != TipoMensaje.Exito || documento.Datos is null)
+        {
+            return;
+        }
+
+        var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        if (tokenPublico.IdTipoMensaje != TipoMensaje.Exito || tokenPublico.Datos is null)
+        {
+            return;
+        }
+
+        var pdfBytes = generadorPdf.Construir(documento.Datos, empresa, tokenPublico.Datos, documento.Datos.Cabecera.SunatHash, anulado: true);
+
+        var nombreArchivo = $"{documento.Datos.Cabecera.Serie}-{documento.Datos.Cabecera.Correlativo}-{DateTime.UtcNow:yyyyMMddHHmmss}-anulado.pdf";
+        var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, pdfBytes, cancellationToken);
+        var hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
+
+        var archivo = new ArchivoDocumento(
+            idDocumentoElectronico, idLoteDocumento, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
         await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
     }
 }
