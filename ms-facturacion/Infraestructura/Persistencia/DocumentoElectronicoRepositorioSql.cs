@@ -530,6 +530,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
                     lector.GetString(lector.GetOrdinal("NumeroFactura")),
                     lector.GetString(lector.GetOrdinal("TipoDocumentoTexto")),
+                    LeerNullableString(lector, "DocumentoAfectado"),
                     lector.GetString(lector.GetOrdinal("ClienteNombre")),
                     DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
                     lector.GetString(lector.GetOrdinal("FormaPagoCodigo")),
