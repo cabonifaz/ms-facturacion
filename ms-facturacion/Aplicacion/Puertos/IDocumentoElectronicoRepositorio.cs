@@ -86,4 +86,10 @@ public interface IDocumentoElectronicoRepositorio
     /// uno de Comunicación de Baja, ya que SUNAT usa el mismo código para ambos.
     Task<ResultadoOperacion<IReadOnlyList<EventoDocumentoReciente>>> ListarEventosRecientesAsync(
         int idInquilino, int ultimoIdEvento, CancellationToken cancellationToken);
+
+    /// Dashboard de PedidoFactura en maximlian3_backend — reemplaza el cálculo que vivía ahí sobre
+    /// TARIFARIO. Ver SP_DocumentoElectronico_ObtenerResumenFacturacion para el criterio completo (neto de
+    /// Notas, convertido a PEN, con el chequeo de fecha del documento afectado).
+    Task<ResultadoOperacion<ResumenFacturacion>> ObtenerResumenFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, CancellationToken cancellationToken);
 }
