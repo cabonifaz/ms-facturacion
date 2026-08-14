@@ -877,7 +877,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var resumen = new ResumenFacturacion(
                 lector.GetInt32(lector.GetOrdinal("CantidadFacturas")),
                 lector.GetDecimal(lector.GetOrdinal("MontoTotalPEN")),
-                LeerNullableDecimal(lector, "PromedioIngresoPEN"));
+                LeerNullableDecimal(lector, "PromedioIngresoPEN"),
+                lector.GetString(lector.GetOrdinal("MonedaIcono")));
 
             return ResultadoOperacion<ResumenFacturacion>.DeExito(mensaje, resumen);
         }
