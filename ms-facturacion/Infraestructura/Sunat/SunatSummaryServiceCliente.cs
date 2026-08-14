@@ -11,7 +11,7 @@ namespace ms_facturacion.Infraestructura.Sunat;
 /// sendSummary/getStatus — mismo billService, mismo WS-Security UsernameToken que sendBill
 /// (ver SunatBillServiceCliente); solo cambian el nombre de la operación SOAP y la forma de la respuesta.
 public sealed class SunatSummaryServiceCliente(
-    HttpClient httpClient, IHostEnvironment entorno, ILogger<SunatSummaryServiceCliente> logger) : ISunatSummaryServiceCliente
+    HttpClient httpClient, ILogger<SunatSummaryServiceCliente> logger) : ISunatSummaryServiceCliente
 {
     private static readonly XNamespace SoapEnv = "http://schemas.xmlsoap.org/soap/envelope/";
     private static readonly XNamespace Ser = "http://service.sunat.gob.pe";
@@ -30,7 +30,7 @@ public sealed class SunatSummaryServiceCliente(
                     new XElement("fileName", nombreArchivoZip),
                     new XElement("contentFile", Convert.ToBase64String(zipBytes))));
 
-            var cuerpoRespuesta = await EnviarSobreAsync(url, sobre, "sendSummary", cancellationToken);
+            var cuerpoRespuesta = await EnviarSobreAsync(url, sobre, cancellationToken);
             if (cuerpoRespuesta is null)
             {
                 return ResultadoOperacion<string>.DeErrorSistema("No se pudo conectar con SUNAT.");
@@ -59,6 +59,9 @@ public sealed class SunatSummaryServiceCliente(
         }
         catch (Exception ex)
         {
+            // Mismo criterio que SunatBillServiceCliente.EnviarAsync — sin esto, una excepción de red/TLS/DNS
+            // acá no queda registrada en ningún lado, solo ex.Message en el envelope de respuesta.
+            logger.LogError(ex, "sendSummary — excepción no controlada al llamar a {Url}.", url);
             return ResultadoOperacion<string>.DeErrorSistema(ex.Message);
         }
     }
@@ -71,7 +74,7 @@ public sealed class SunatSummaryServiceCliente(
             var sobre = ConstruirSobre(usuarioSolCompleto, claveSol,
                 new XElement(Ser + "getStatus", new XElement("ticket", ticket)));
 
-            var cuerpoRespuesta = await EnviarSobreAsync(url, sobre, "getStatus", cancellationToken);
+            var cuerpoRespuesta = await EnviarSobreAsync(url, sobre, cancellationToken);
             if (cuerpoRespuesta is null)
             {
                 return ResultadoOperacion<ResultadoConsultaTicket>.DeErrorSistema("No se pudo conectar con SUNAT.");
@@ -131,6 +134,8 @@ public sealed class SunatSummaryServiceCliente(
         }
         catch (Exception ex)
         {
+            // Mismo criterio que SunatBillServiceCliente.EnviarAsync.
+            logger.LogError(ex, "getStatus — excepción no controlada al llamar a {Url}.", url);
             return ResultadoOperacion<ResultadoConsultaTicket>.DeErrorSistema(ex.Message);
         }
     }
@@ -177,7 +182,7 @@ public sealed class SunatSummaryServiceCliente(
                             claveSol)))),
             new XElement(SoapEnv + "Body", cuerpoOperacion)));
 
-    private async Task<string?> EnviarSobreAsync(string url, XDocument sobre, string nombreOperacion, CancellationToken cancellationToken)
+    private async Task<string?> EnviarSobreAsync(string url, XDocument sobre, CancellationToken cancellationToken)
     {
         using var contenido = new StringContent(sobre.ToString(SaveOptions.DisableFormatting), Encoding.UTF8, "text/xml");
         contenido.Headers.ContentType = new MediaTypeHeaderValue("text/xml") { CharSet = "utf-8" };
@@ -186,16 +191,7 @@ public sealed class SunatSummaryServiceCliente(
         solicitud.Headers.TryAddWithoutValidation("SOAPAction", "");
 
         using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
-        var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
-
-        if (entorno.IsDevelopment())
-        {
-            logger.LogInformation(
-                "{NombreOperacion} — HTTP {StatusCode}. Respuesta cruda de SUNAT:\n{CuerpoRespuesta}",
-                nombreOperacion, (int)respuesta.StatusCode, cuerpoRespuesta);
-        }
-
-        return cuerpoRespuesta;
+        return await respuesta.Content.ReadAsStringAsync(cancellationToken);
     }
 
     private static byte[] ExtraerXmlDelZip(byte[] zipBytes)

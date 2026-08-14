@@ -329,20 +329,19 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             return new ResultadoOperacion<ResultadoEnvioSunat>(envio.IdTipoMensaje, envio.Mensaje, default);
         }
 
-        var idArchivoCdr = await GuardarYRegistrarArchivoAsync(
+        // Cdr y Pdf tampoco dependen entre sí (el Pdf depende del token público + los bytes del CDR ya
+        // firmados, no del registro del CDR en ARCHIVOS_DOCUMENTO) — mismo criterio que Xml/Zip arriba:
+        // se disparan juntos en vez de esperar el CDR antes de siquiera empezar a construir el Pdf.
+        var archivoCdrTask = GuardarYRegistrarArchivoAsync(
             idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
 
-        int? idArchivoPdf = null;
-        if (envio.Datos.EstadoCodigo is EstadoMaestroCodigo.Aceptado or EstadoMaestroCodigo.AceptadoConObservaciones)
-        {
-            var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
-            if (tokenPublico.IdTipoMensaje == TipoMensaje.Exito && tokenPublico.Datos is not null)
-            {
-                var pdfBytes = generadorPdf.Construir(documento.Datos, empresa.Datos, tokenPublico.Datos, sunatHash);
-                idArchivoPdf = await GuardarYRegistrarArchivoAsync(
-                    idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.pdf", pdfBytes, "Pdf", "application/pdf", cancellationToken);
-            }
-        }
+        var archivoPdfTask = envio.Datos.EstadoCodigo is EstadoMaestroCodigo.Aceptado or EstadoMaestroCodigo.AceptadoConObservaciones
+            ? ConstruirYGuardarPdfAsync(idInquilino, cabecera, documento.Datos, empresa.Datos, sunatHash, carpeta, nombreAlmacenamiento, cancellationToken)
+            : Task.FromResult<int?>(null);
+
+        await Task.WhenAll(archivoCdrTask, archivoPdfTask);
+        var idArchivoCdr = await archivoCdrTask;
+        var idArchivoPdf = await archivoPdfTask;
 
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
@@ -379,6 +378,21 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             RelojPeru.Ahora(), cancellationToken);
 
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("Documento procesado por SUNAT.", envio.Datos);
+    }
+
+    private async Task<int?> ConstruirYGuardarPdfAsync(
+        int idInquilino, DocumentoElectronico cabecera, DocumentoElectronicoDetalle datosDocumento, Empresa empresa,
+        string? sunatHash, string carpeta, string nombreAlmacenamiento, CancellationToken cancellationToken)
+    {
+        var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
+        if (tokenPublico.IdTipoMensaje != TipoMensaje.Exito || tokenPublico.Datos is null)
+        {
+            return null;
+        }
+
+        var pdfBytes = generadorPdf.Construir(datosDocumento, empresa, tokenPublico.Datos, sunatHash);
+        return await GuardarYRegistrarArchivoAsync(
+            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.pdf", pdfBytes, "Pdf", "application/pdf", cancellationToken);
     }
 
     private async Task<int?> GuardarYRegistrarArchivoAsync(
