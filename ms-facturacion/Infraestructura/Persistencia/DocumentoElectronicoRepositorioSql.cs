@@ -289,6 +289,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 LeerNullableString(lector, "Direccion"),
                 lector.GetInt32(lector.GetOrdinal("PaisCodigo")));
             var idMonedaMaestro = lector.GetInt32(lector.GetOrdinal("IdMonedaMaestro"));
+            var tipoCambio = LeerNullableDecimal(lector, "TipoCambio");
 
             await lector.NextResultAsync(cancellationToken);
             var productos = new List<ProductoDocumentoResumen>();
@@ -299,7 +300,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
             }
 
-            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, idMonedaMaestro, productos));
+            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, idMonedaMaestro, tipoCambio, productos));
         }
         catch (Exception ex)
         {
