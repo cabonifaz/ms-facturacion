@@ -21,16 +21,46 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     IArchivoDocumentoRepositorio archivoRepositorio,
     ISunatSummaryServiceCliente sunatCliente,
     IErrorDocumentoRepositorio errorRepositorio,
-    IGeneradorPdfComprobanteServicio generadorPdf)
+    IGeneradorPdfComprobanteServicio generadorPdf,
+    ILogger<ConsultarTicketComunicacionBajaCasoDeUso> logger)
 {
     private const string UsuarioWorker = "ms-facturacion-worker";
 
     public async Task<ResultadoOperacion<ResultadoConsultaTicket>> EjecutarAsync(
         int idInquilino, int idLoteDocumento, string ambienteCodigo, CancellationToken cancellationToken)
     {
+        try
+        {
+            return await EjecutarInternoAsync(idInquilino, idLoteDocumento, ambienteCodigo, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Mismo criterio que EnviarDocumentoElectronicoASunatCasoDeUso/EnviarComunicacionBajaASunatCasoDeUso.
+            logger.LogError(
+                ex, "ConsultarTicketComunicacionBaja — excepción no controlada. idInquilino={IdInquilino}, idLoteDocumento={IdLoteDocumento}, ambienteCodigo={AmbienteCodigo}.",
+                idInquilino, idLoteDocumento, ambienteCodigo);
+
+            return ResultadoOperacion<ResultadoConsultaTicket>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    private void LogSiErrorSistema(TipoMensaje idTipoMensaje, string mensaje, int idLoteDocumento, string contexto)
+    {
+        if (idTipoMensaje == TipoMensaje.ErrorSistema)
+        {
+            logger.LogError(
+                "ConsultarTicketComunicacionBaja — {Contexto}. idLoteDocumento={IdLoteDocumento}: {Mensaje}",
+                contexto, idLoteDocumento, mensaje);
+        }
+    }
+
+    private async Task<ResultadoOperacion<ResultadoConsultaTicket>> EjecutarInternoAsync(
+        int idInquilino, int idLoteDocumento, string ambienteCodigo, CancellationToken cancellationToken)
+    {
         var lote = await loteRepositorio.ObtenerAsync(idInquilino, idLoteDocumento, cancellationToken);
         if (lote.IdTipoMensaje != TipoMensaje.Exito || lote.Datos is null)
         {
+            LogSiErrorSistema(lote.IdTipoMensaje, lote.Mensaje, idLoteDocumento, "falló al obtener el lote");
             return new ResultadoOperacion<ResultadoConsultaTicket>(lote.IdTipoMensaje, lote.Mensaje, default);
         }
 
@@ -47,15 +77,25 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             return ResultadoOperacion<ResultadoConsultaTicket>.DeReglaDeNegocio("El lote no tiene un ticket registrado.");
         }
 
-        var empresa = await empresaRepositorio.ObtenerAsync(idInquilino, cabecera.IdEmpresa, cancellationToken);
+        // empresa/configuracion/claveSol no dependen entre sí — mismo criterio que EnviarDocumentoElectronico
+        // ASunatCasoDeUso/EnviarComunicacionBajaASunatCasoDeUso.
+        var empresaTask = empresaRepositorio.ObtenerAsync(idInquilino, cabecera.IdEmpresa, cancellationToken);
+        var configuracionTask = configuracionRepositorio.ObtenerPorEmpresaYAmbienteAsync(idInquilino, cabecera.IdEmpresa, ambienteCodigo, cancellationToken);
+        var claveSolTask = credencialRepositorio.ObtenerPorTipoAsync(idInquilino, cabecera.IdEmpresa, "ClaveSol", cancellationToken);
+
+        await Task.WhenAll(empresaTask, configuracionTask, claveSolTask);
+
+        var empresa = await empresaTask;
         if (empresa.IdTipoMensaje != TipoMensaje.Exito || empresa.Datos is null)
         {
+            LogSiErrorSistema(empresa.IdTipoMensaje, empresa.Mensaje, idLoteDocumento, "falló al obtener la empresa");
             return new ResultadoOperacion<ResultadoConsultaTicket>(empresa.IdTipoMensaje, empresa.Mensaje, default);
         }
 
-        var configuracion = await configuracionRepositorio.ObtenerPorEmpresaYAmbienteAsync(idInquilino, cabecera.IdEmpresa, ambienteCodigo, cancellationToken);
+        var configuracion = await configuracionTask;
         if (configuracion.IdTipoMensaje != TipoMensaje.Exito || configuracion.Datos is null)
         {
+            LogSiErrorSistema(configuracion.IdTipoMensaje, configuracion.Mensaje, idLoteDocumento, "falló al obtener la configuración de facturación");
             return new ResultadoOperacion<ResultadoConsultaTicket>(configuracion.IdTipoMensaje, configuracion.Mensaje, default);
         }
 
@@ -65,9 +105,10 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
                 "La configuración de facturación de la empresa no tiene URL de envío (billService).");
         }
 
-        var claveSol = await credencialRepositorio.ObtenerPorTipoAsync(idInquilino, cabecera.IdEmpresa, "ClaveSol", cancellationToken);
+        var claveSol = await claveSolTask;
         if (claveSol.IdTipoMensaje != TipoMensaje.Exito || claveSol.Datos is null)
         {
+            LogSiErrorSistema(claveSol.IdTipoMensaje, claveSol.Mensaje, idLoteDocumento, "falló al obtener la credencial ClaveSol");
             return new ResultadoOperacion<ResultadoConsultaTicket>(claveSol.IdTipoMensaje, claveSol.Mensaje, default);
         }
 
@@ -75,6 +116,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             idInquilino, claveSol.Datos.ValorCifrado, claveSol.Datos.Nonce, claveSol.Datos.Tag, cancellationToken);
         if (claveSolDescifrada.IdTipoMensaje != TipoMensaje.Exito || claveSolDescifrada.Datos is null)
         {
+            LogSiErrorSistema(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, idLoteDocumento, "falló al descifrar la ClaveSol");
             return new ResultadoOperacion<ResultadoConsultaTicket>(claveSolDescifrada.IdTipoMensaje, claveSolDescifrada.Mensaje, default);
         }
 
@@ -85,6 +127,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
 
         if (consulta.IdTipoMensaje != TipoMensaje.Exito || consulta.Datos is null)
         {
+            LogSiErrorSistema(consulta.IdTipoMensaje, consulta.Mensaje, idLoteDocumento, "getStatus falló");
             return new ResultadoOperacion<ResultadoConsultaTicket>(consulta.IdTipoMensaje, consulta.Mensaje, default);
         }
 
@@ -110,24 +153,23 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
             await itemRepositorio.ActualizarEstadoSunatTodosAsync(
                 UsuarioWorker, idInquilino, idLoteDocumento, EstadoMaestroCodigo.TicketConError, null, null, cancellationToken);
 
+            // Cada item es un IdDocumentoElectronico distinto (filas independientes) — se procesan todos en
+            // paralelo; dentro de cada item, el update de estado y el insert de error tampoco dependen entre sí.
             var ahoraError = RelojPeru.Ahora();
-            foreach (var item in lote.Datos.Items)
-            {
-                await documentoRepositorio.ActualizarEstadoSunatAsync(
+            await Task.WhenAll(lote.Datos.Items.Select(item => Task.WhenAll(
+                documentoRepositorio.ActualizarEstadoSunatAsync(
                     UsuarioWorker, idInquilino, item.IdDocumentoElectronico, EstadoMaestroCodigo.ComunicacionBajaConError,
-                    null, null, null, null, ahoraError, cancellationToken);
-
+                    null, null, null, null, ahoraError, cancellationToken),
                 // Mismo criterio que el branch de abajo (statusCode 0, Rechazada) — ComunicacionBajaConError
                 // es un fallo real (el ticket nunca se resolvió), no debía quedar sin registro en
                 // ERRORES_DOCUMENTO solo porque no vino de un CDR.
-                await errorRepositorio.InsertarAsync(
+                errorRepositorio.InsertarAsync(
                     UsuarioWorker, idInquilino,
                     new ErrorDocumento(
                         item.IdDocumentoElectronico, null, "Sunat",
                         consulta.Datos.SunatCodigoRespuesta ?? string.Empty, consulta.Mensaje,
                         null, "Error"),
-                    cancellationToken);
-            }
+                    cancellationToken))));
 
             return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
         }
@@ -148,29 +190,37 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         var severidad = consulta.Datos.EstadoCodigo == EstadoMaestroCodigo.ComunicacionBajaRechazada ? "Error" : "Advertencia";
         var ahora = RelojPeru.Ahora();
 
-        foreach (var item in lote.Datos.Items)
-        {
-            await documentoRepositorio.ActualizarEstadoSunatAsync(
-                UsuarioWorker, idInquilino, item.IdDocumentoElectronico, consulta.Datos.EstadoCodigo,
-                null, consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, null, ahora, cancellationToken);
-
-            if (!esAceptado)
-            {
-                await errorRepositorio.InsertarAsync(
-                    UsuarioWorker, idInquilino,
-                    new ErrorDocumento(
-                        item.IdDocumentoElectronico, null, "Sunat",
-                        consulta.Datos.SunatCodigoRespuesta ?? string.Empty, consulta.Datos.SunatDescripcionRespuesta ?? string.Empty,
-                        null, severidad),
-                    cancellationToken);
-            }
-            else
-            {
-                await RegenerarPdfAnuladoAsync(idInquilino, idLoteDocumento, item.IdDocumentoElectronico, carpeta, empresa.Datos, cancellationToken);
-            }
-        }
+        // Cada item es un IdDocumentoElectronico distinto — se procesan todos en paralelo en vez de uno
+        // detrás de otro (mismo criterio que los dos branches de arriba).
+        await Task.WhenAll(lote.Datos.Items.Select(item => ProcesarItemBajaAsync(
+            idInquilino, idLoteDocumento, item.IdDocumentoElectronico, consulta.Datos.EstadoCodigo,
+            consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, ahora,
+            esAceptado, severidad, carpeta, empresa.Datos, cancellationToken)));
 
         return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
+    }
+
+    // El update de estado y el siguiente paso (insertar error o regenerar el Pdf) tampoco dependen entre sí.
+    private async Task ProcesarItemBajaAsync(
+        int idInquilino, int idLoteDocumento, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo,
+        string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, DateTime ahora, bool esAceptado,
+        string severidad, string carpeta, Empresa empresa, CancellationToken cancellationToken)
+    {
+        var actualizarTask = documentoRepositorio.ActualizarEstadoSunatAsync(
+            UsuarioWorker, idInquilino, idDocumentoElectronico, estadoCodigo,
+            null, sunatCodigoRespuesta, sunatDescripcionRespuesta, null, ahora, cancellationToken);
+
+        var siguienteTask = esAceptado
+            ? RegenerarPdfAnuladoAsync(idInquilino, idLoteDocumento, idDocumentoElectronico, carpeta, empresa, cancellationToken)
+            : errorRepositorio.InsertarAsync(
+                UsuarioWorker, idInquilino,
+                new ErrorDocumento(
+                    idDocumentoElectronico, null, "Sunat",
+                    sunatCodigoRespuesta ?? string.Empty, sunatDescripcionRespuesta ?? string.Empty,
+                    null, severidad),
+                cancellationToken);
+
+        await Task.WhenAll(actualizarTask, siguienteTask);
     }
 
     private async Task GuardarCdrAsync(
@@ -181,7 +231,9 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         var hash = Convert.ToHexString(SHA256.HashData(cdrXmlBytes)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(null, idLoteDocumento, "Cdr", nombreArchivo, ruta, "application/xml", hash, cdrXmlBytes.LongLength);
-        await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+        var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+        LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idLoteDocumento,
+            $"se guardó {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
     }
 
     // Regenera el PDF del documento ya anulado con la marca de agua "ANULADO" y lo guarda como una fila
@@ -193,15 +245,24 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     private async Task RegenerarPdfAnuladoAsync(
         int idInquilino, int idLoteDocumento, int idDocumentoElectronico, string carpeta, Empresa empresa, CancellationToken cancellationToken)
     {
-        var documento = await documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        // documento y tokenPublico no dependen entre sí — ambos solo necesitan idInquilino/idDocumentoElectronico.
+        var documentoTask = documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        var tokenPublicoTask = documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        await Task.WhenAll(documentoTask, tokenPublicoTask);
+
+        var documento = await documentoTask;
         if (documento.IdTipoMensaje != TipoMensaje.Exito || documento.Datos is null)
         {
+            LogSiErrorSistema(documento.IdTipoMensaje, documento.Mensaje, idLoteDocumento,
+                $"falló al obtener el documento {idDocumentoElectronico} para regenerar su Pdf anulado");
             return;
         }
 
-        var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, idDocumentoElectronico, cancellationToken);
+        var tokenPublico = await tokenPublicoTask;
         if (tokenPublico.IdTipoMensaje != TipoMensaje.Exito || tokenPublico.Datos is null)
         {
+            LogSiErrorSistema(tokenPublico.IdTipoMensaje, tokenPublico.Mensaje, idLoteDocumento,
+                $"falló al obtener el token público del documento {idDocumentoElectronico} para regenerar su Pdf anulado");
             return;
         }
 
@@ -213,6 +274,8 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
 
         var archivo = new ArchivoDocumento(
             idDocumentoElectronico, idLoteDocumento, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
-        await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+        var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
+        LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idLoteDocumento,
+            $"se guardó el Pdf anulado de {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
     }
 }
