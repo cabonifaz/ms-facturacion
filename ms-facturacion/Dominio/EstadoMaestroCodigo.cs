@@ -7,7 +7,7 @@ namespace ms_facturacion.Dominio;
 public enum EstadoMaestroCodigo
 {
     PendienteEnvio = 1,
-    Enviado = 2,
+    Enviando = 2,
     Aceptado = 3,
     AceptadoConObservaciones = 4,
     Rechazado = 5,
