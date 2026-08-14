@@ -57,9 +57,12 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
 
-    /// Revalida saldo y moneda de una Nota de Crédito justo antes de enviarla a SUNAT y, si pasa, la marca
-    /// Enviando (reserva) — ver SP_DocumentoElectronico_ValidarSaldoNotaCredito. No-op (éxito) para
-    /// cualquier tipo de documento que no sea Nota de Crédito.
+    /// Reserva previa al envío, para los 4 tipos de documento: si pasa, marca el documento como Enviando —
+    /// evita que un reintento concurrente del mismo documento se envíe dos veces en paralelo. Para Factura/
+    /// Boleta es solo eso. Para Nota de Crédito/Débito, además revalida bajo lock que el documento afectado
+    /// siga Aceptado/no anulado y que la moneda coincida; para Nota de Crédito específicamente también
+    /// revalida el saldo disponible. Ver SP_DocumentoElectronico_ValidarSaldoNotaCredito (el nombre quedó
+    /// del alcance original, acotado solo a Nota de Crédito, antes de extenderse a los otros 3 tipos).
     Task<ResultadoOperacion<bool>> ValidarSaldoNotaCreditoAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
