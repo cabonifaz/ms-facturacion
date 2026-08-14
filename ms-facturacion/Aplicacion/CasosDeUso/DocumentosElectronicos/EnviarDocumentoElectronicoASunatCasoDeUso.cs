@@ -206,20 +206,23 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         var idArchivoZip = await GuardarYRegistrarArchivoAsync(
             idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
 
-        // Nota de Crédito: revalida el saldo disponible justo antes de contactar a SUNAT — Insertar/
-        // GuardarCambios ya lo validaron al guardar, pero solo cuentan Notas ya Aceptadas, así que dos
-        // borradores PendienteEnvio contra la misma Factura pueden pasar esa validación individualmente y
-        // sobre-acreditar igual una vez que ambos se envían y SUNAT los acepta. No-op (éxito) para
-        // cualquier otro tipo de documento. Se ubica acá, después de armar/firmar/subir XML+ZIP pero antes
-        // de registrar el intento de transmisión y de sendBill — el punto más tardío posible antes del
-        // envío real, sin dejar un intento de transmisión abierto si termina rechazado acá.
-        if (cabecera.TipoDocumentoCodigo == "07")
+        // Nota de Crédito/Débito: revalida (bajo lock) que el documento afectado siga Aceptado y no anulado,
+        // y la moneda — Insertar/GuardarCambios ya lo validaron al guardar, pero el documento afectado pudo
+        // cambiar de estado/moneda después mientras la Nota seguía PendienteEnvio. Para Nota de Crédito
+        // también revalida el saldo disponible: dos borradores PendienteEnvio contra la misma Factura pueden
+        // pasar esa validación individualmente y sobre-acreditar igual una vez que ambos se envían y SUNAT
+        // los acepta. Si pasa, marca la Nota como Enviando (reserva) — así una Nota de Crédito concurrente
+        // ve el saldo tomado, y SP_LoteDocumento_Insertar bloquea anular el documento afectado mientras esta
+        // Nota sigue en vuelo. No-op (éxito) para Factura/Boleta. Se ubica acá, después de armar/firmar/subir
+        // XML+ZIP pero antes de registrar el intento de transmisión y de sendBill — el punto más tardío
+        // posible antes del envío real, sin dejar un intento de transmisión abierto si termina rechazado acá.
+        if (cabecera.TipoDocumentoCodigo is "07" or "08")
         {
             var saldo = await documentoRepositorio.ValidarSaldoNotaCreditoAsync(UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
             if (saldo.IdTipoMensaje != TipoMensaje.Exito)
             {
                 logger.LogWarning(
-                    "EnviarASunat — la Nota de Crédito no pasó la revalidación de saldo previa al envío: {Mensaje}", saldo.Mensaje);
+                    "EnviarASunat — la Nota no pasó la revalidación previa al envío: {Mensaje}", saldo.Mensaje);
                 return new ResultadoOperacion<ResultadoEnvioSunat>(saldo.IdTipoMensaje, saldo.Mensaje, default);
             }
         }
@@ -260,9 +263,9 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             // ErrorSistema = nunca hubo respuesta de SUNAT (ver el catch de SunatBillServiceCliente.EnviarAsync:
             // excepción de red/TLS/DNS antes de completar el request-response). Eso es un problema de
             // nuestro propio código/infraestructura, no un hecho sobre el documento — se deja en
-            // PendienteEnvio para reintentar sin necesidad de "recuperarse" de nada. En Nota de Crédito esto
-            // además libera la reserva de saldo (Enviando) que dejó ValidarSaldoNotaCreditoAsync — si no se
-            // revierte, esa Nota quedaría "quemando" saldo para siempre sin haberse enviado nunca.
+            // PendienteEnvio para reintentar sin necesidad de "recuperarse" de nada. En Nota de Crédito/Débito
+            // esto además libera la reserva (Enviando) que dejó ValidarSaldoNotaCreditoAsync — si no se
+            // revierte, la Nota quedaría "en vuelo" para siempre sin haberse enviado nunca.
             if (envio.IdTipoMensaje == TipoMensaje.ReglaDeNegocio)
             {
                 await documentoRepositorio.ActualizarEstadoSunatAsync(
@@ -274,7 +277,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
                     new ErrorDocumento(cabecera.IdDocumentoElectronico, transmision.Datos, "Sunat", string.Empty, envio.Mensaje, null, "Error"),
                     cancellationToken);
             }
-            else if (cabecera.TipoDocumentoCodigo == "07")
+            else if (cabecera.TipoDocumentoCodigo is "07" or "08")
             {
                 await documentoRepositorio.ActualizarEstadoSunatAsync(
                     UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, EstadoMaestroCodigo.PendienteEnvio,
