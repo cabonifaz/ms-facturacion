@@ -57,6 +57,12 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
 
+    /// Revalida saldo y moneda de una Nota de Crédito justo antes de enviarla a SUNAT y, si pasa, la marca
+    /// Enviando (reserva) — ver SP_DocumentoElectronico_ValidarSaldoNotaCredito. No-op (éxito) para
+    /// cualquier tipo de documento que no sea Nota de Crédito.
+    Task<ResultadoOperacion<bool>> ValidarSaldoNotaCreditoAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
+
     /// "Guardar cambios" en lote: reemplaza el diseño anterior de 6 endpoints granulares (Agregar/Actualizar/
     /// Eliminar por línea/cuota) — el llamador manda el estado final deseado de líneas y cuotas, y el SP
     /// calcula el diff (insertar/actualizar/dar de baja) en una sola transacción.
