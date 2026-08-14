@@ -288,6 +288,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 LeerNullableString(lector, "Correo"),
                 LeerNullableString(lector, "Direccion"),
                 lector.GetInt32(lector.GetOrdinal("PaisCodigo")));
+            var idMonedaMaestro = lector.GetInt32(lector.GetOrdinal("IdMonedaMaestro"));
 
             await lector.NextResultAsync(cancellationToken);
             var productos = new List<ProductoDocumentoResumen>();
@@ -298,7 +299,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
             }
 
-            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, productos));
+            return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, idMonedaMaestro, productos));
         }
         catch (Exception ex)
         {
@@ -667,6 +668,32 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
             comando.Parameters.AddWithValue("@dtmFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.Add("@timHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            return idTipoMensaje == TipoMensaje.Exito
+                ? ResultadoOperacion<bool>.DeExito(mensaje, true)
+                : new ResultadoOperacion<bool>(idTipoMensaje, mensaje, default);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<bool>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<bool>> ValidarSaldoNotaCreditoAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ValidarSaldoNotaCredito", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
