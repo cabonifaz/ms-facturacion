@@ -329,6 +329,16 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             return new ResultadoOperacion<ResultadoEnvioSunat>(envio.IdTipoMensaje, envio.Mensaje, default);
         }
 
+        // El update de estado se adelanta a este punto (antes iba al final, después de Cdr/Pdf) —
+        // SP_DocumentoElectronico_ObtenerTokenPublico (llamado dentro de ConstruirYGuardarPdfAsync) solo
+        // devuelve el token cuando EstadoCodigo ya es Aceptado/AceptadoConObservaciones (cambio del
+        // 12/08/2026 en ese SP); con el update al final, el documento seguía figurando "Enviando" en la
+        // base justo cuando se pedía el token, así que el Pdf nunca se generaba durante sendBill.
+        await documentoRepositorio.ActualizarEstadoSunatAsync(
+            UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo,
+            sunatHash, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
+            RelojPeru.Ahora(), cancellationToken);
+
         // Cdr y Pdf tampoco dependen entre sí (el Pdf depende del token público + los bytes del CDR ya
         // firmados, no del registro del CDR en ARCHIVOS_DOCUMENTO) — mismo criterio que Xml/Zip arriba:
         // se disparan juntos en vez de esperar el CDR antes de siquiera empezar a construir el Pdf.
@@ -371,11 +381,6 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
                     cancellationToken);
             }
         }
-
-        await documentoRepositorio.ActualizarEstadoSunatAsync(
-            UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, envio.Datos.EstadoCodigo,
-            sunatHash, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null,
-            RelojPeru.Ahora(), cancellationToken);
 
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("Documento procesado por SUNAT.", envio.Datos);
     }
