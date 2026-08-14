@@ -67,6 +67,7 @@ public sealed class DocumentosElectronicosController(
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
+    ObtenerResumenFacturacionCasoDeUso obtenerResumenFacturacionCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -231,6 +232,18 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await listarParaPedidoFacturaCasoDeUso.EjecutarAsync(
             idInquilino, idEmpresa, estadoCodigo, idFormaPago, fechaDesde, fechaHasta, busqueda, pagina, tamanoPagina, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de PedidoFactura en maximlian3_backend — ver SP_DocumentoElectronico_ObtenerResumenFacturacion.
+    [HttpGet("resumen")]
+    public async Task<IActionResult> ObtenerResumenFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerResumenFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
