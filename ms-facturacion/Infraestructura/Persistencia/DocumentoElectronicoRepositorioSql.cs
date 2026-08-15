@@ -924,10 +924,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
         tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
+        tabla.Columns.Add("FechaPago", typeof(DateTime));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto, cuota.IdEstadoCuotaMaestro);
+            tabla.Rows.Add(
+                cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
+                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
         }
 
         return tabla;
@@ -999,10 +1002,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
         tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
+        tabla.Columns.Add("FechaPago", typeof(DateTime));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto, cuota.IdEstadoCuotaMaestro);
+            tabla.Rows.Add(
+                cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
+                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
         }
 
         return tabla;
