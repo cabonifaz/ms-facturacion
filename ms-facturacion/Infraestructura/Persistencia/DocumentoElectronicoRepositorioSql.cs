@@ -598,6 +598,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
                     lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                     LeerNullableDecimal(lector, "TipoCambio"),
+                    LeerNullableString(lector, "EstadoAnulacionCodigo"),
                     LeerNullableDateOnly(lector, "FechaEmisionDocModificado"),
                     LeerNullableString(lector, "TipoDocumentoRelacionadoCodigo"),
                     LeerNullableString(lector, "SerieRelacionada"),
