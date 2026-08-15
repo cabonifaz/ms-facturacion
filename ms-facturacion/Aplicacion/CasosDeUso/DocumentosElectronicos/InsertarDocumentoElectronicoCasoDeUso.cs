@@ -14,7 +14,7 @@ public sealed class InsertarDocumentoElectronicoCasoDeUso(IDocumentoElectronicoR
         int idTipoDocumentoMaestro,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
     {
         var ahora = RelojPeru.Ahora();

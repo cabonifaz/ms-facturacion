@@ -18,7 +18,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
     {
         try
@@ -713,7 +713,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
-        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
+        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
     {
         try
@@ -916,17 +916,18 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION.
-    private static DataTable ConstruirTablaCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronico> cuotas)
+    private static DataTable ConstruirTablaCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
     {
         var tabla = new DataTable();
         tabla.Columns.Add("IdCuotaDocumentoElectronico", typeof(int));
         tabla.Columns.Add("NumeroCuota", typeof(int));
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
+        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto);
+            tabla.Rows.Add(cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto, cuota.IdEstadoCuotaMaestro);
         }
 
         return tabla;
@@ -956,10 +957,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetDecimal(lector.GetOrdinal("TotalLinea")));
 
     private static CuotaDocumentoElectronico LeerCuota(SqlDataReader lector) => new(
+        lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
         DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
         lector.GetDecimal(lector.GetOrdinal("Monto")),
-        lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")),
         lector.GetString(lector.GetOrdinal("EstadoCuotaCodigo")),
         lector.IsDBNull(lector.GetOrdinal("FechaPago")) ? null : lector.GetDateTime(lector.GetOrdinal("FechaPago")));
 
@@ -991,16 +992,17 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO.
-    private static DataTable ConstruirTablaCuotas(IReadOnlyList<CuotaDocumentoElectronico> cuotas)
+    private static DataTable ConstruirTablaCuotas(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
     {
         var tabla = new DataTable();
         tabla.Columns.Add("NumeroCuota", typeof(int));
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
+        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto);
+            tabla.Rows.Add(cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto, cuota.IdEstadoCuotaMaestro);
         }
 
         return tabla;

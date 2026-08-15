@@ -10,7 +10,7 @@ public interface IDocumentoElectronicoRepositorio
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<DocumentoElectronicoDetalle>> ObtenerAsync(
@@ -75,7 +75,7 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
-        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
+        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 
     /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo

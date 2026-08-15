@@ -6,7 +6,7 @@ using ms_facturacion.Dominio;
 namespace ms_facturacion.Controllers;
 
 public sealed record FormaPagoPeticion(int? IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
-public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
+public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto, int IdEstadoCuotaMaestro);
 public sealed record ClientePeticion(
     int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
@@ -34,7 +34,8 @@ public sealed record LineaEdicionPeticion(
 
 /// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
 public sealed record CuotaEdicionPeticion(
-    DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
+    DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdEstadoCuotaMaestro,
+    int IdCuotaDocumentoElectronico = 0);
 
 /// Campo extra dentro de "Guardar cambios" en lote — mismo criterio de IdCampoExtraDocumentoElectronico
 /// que LineaEdicionPeticion/CuotaEdicionPeticion.
@@ -92,7 +93,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var cuotas = (peticion.FormaPago?.Cuotas ?? [])
-            .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
+            .Select(cuota => new CuotaDocumentoElectronicoEntrada(
+                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdEstadoCuotaMaestro))
             .ToList();
 
         var camposExtra = (peticion.CamposExtra ?? [])
@@ -125,8 +127,9 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var cuotas = peticion.Cuotas
-            .Select(cuota => new CuotaDocumentoElectronico(
-                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdCuotaDocumentoElectronico))
+            .Select(cuota => new CuotaDocumentoElectronicoEntrada(
+                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdEstadoCuotaMaestro,
+                cuota.IdCuotaDocumentoElectronico))
             .ToList();
 
         var camposExtra = (peticion.CamposExtra ?? [])
