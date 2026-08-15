@@ -79,10 +79,12 @@ public interface IDocumentoElectronicoRepositorio
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 
     /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo
-    /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT.
+    /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT. fechaPago
+    /// debe ser coherente con estadoCuotaCodigo: NULL si Pendiente, obligatoria si Pagado (permite registrar
+    /// la fecha real de un pago pasado, no siempre "ahora").
     Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarEstadoCuotaAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken);
+        EstadoCuotaCodigo estadoCuotaCodigo, DateTime? fechaPago, CancellationToken cancellationToken);
 
     /// Para que maximlian3_backend sincronice PEDIDO_FACTURA sondeando EVENTOS_DOCUMENTO desde un checkpoint
     /// (IdEventoDocumento, monótono — sin comparar fechas). EsAnulacion distingue un Rechazado de sendBill de

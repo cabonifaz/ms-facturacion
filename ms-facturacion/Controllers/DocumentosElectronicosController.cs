@@ -46,7 +46,7 @@ public sealed record GuardarCambiosDocumentoElectronicoPeticion(
     IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
     IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null, int? IdMotivoMaestro = null);
 
-public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
+public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo, DateTime? FechaPago);
 
 [ApiController]
 [Route("api/v1/documentos-electronicos")]
@@ -152,7 +152,7 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await actualizarEstadoCuotaCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico,
-            peticion.EstadoCuotaCodigo, cancellationToken);
+            peticion.EstadoCuotaCodigo, peticion.FechaPago, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
