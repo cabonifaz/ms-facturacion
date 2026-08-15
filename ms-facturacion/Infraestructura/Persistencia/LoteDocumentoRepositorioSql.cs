@@ -66,6 +66,49 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         }
     }
 
+    public async Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarManualAsync(
+        string usuarioEjecutor, int idInquilino, int idEmpresa, int idDocumentoElectronico, string motivoDescripcion,
+        DateOnly fechaReferencia, DateTime fechaGeneracion, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LoteDocumento_InsertarManual", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@vchMotivoDescripcion", motivoDescripcion);
+            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<LoteDocumentoCreado>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var creado = new LoteDocumentoCreado(
+                lector.GetInt32(lector.GetOrdinal("IdLoteDocumento")),
+                lector.GetString(lector.GetOrdinal("Nombre")),
+                lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                lector.GetDateTime(lector.GetOrdinal("FechaGeneracion")));
+
+            return ResultadoOperacion<LoteDocumentoCreado>.DeExito(mensaje, creado);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<LoteDocumentoCreado>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<LoteDocumentoDetalle>> ObtenerAsync(
         int idInquilino, int idLoteDocumento, CancellationToken cancellationToken)
     {
