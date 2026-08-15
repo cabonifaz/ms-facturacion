@@ -25,6 +25,11 @@ public sealed record InsertarDocumentoElectronicoPeticion(
 public sealed record ActualizarEstadoSunatPeticion(
     EstadoMaestroCodigo EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
 
+/// FechaAnulacion es la fecha real en que ocurrió la anulación en SUNAT (normalmente se descubre después
+/// de que pasó) — no se resuelve con RelojPeru.Ahora() como el resto de fechas server-authoritative de este
+/// controller, porque acá el llamador sí conoce el dato real y no "ahora".
+public sealed record AnularManualmentePeticion(string Motivo, DateTime FechaAnulacion);
+
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
@@ -58,6 +63,7 @@ public sealed class DocumentosElectronicosController(
     ListarDocumentosParaSireRvieCasoDeUso listarParaSireRvieCasoDeUso,
     GenerarTxtSireRvieCasoDeUso generarTxtSireRvieCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
+    AnularManualmenteDocumentoElectronicoCasoDeUso anularManualmenteCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
@@ -286,6 +292,19 @@ public sealed class DocumentosElectronicosController(
         var resultado = await actualizarEstadoSunatCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.EstadoCodigo, peticion.SunatHash,
             peticion.SunatCodigoRespuesta, peticion.SunatDescripcionRespuesta, peticion.SunatTicket, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Para cuando el usuario descubre que SUNAT ya muestra el documento como anulado sin que este sistema
+    // haya tramitado esa baja (p.ej. anulado directo en el portal de SUNAT) — registra esa anulación acá,
+    // con motivo y la fecha real en que ocurrió.
+    [HttpPut("{idDocumentoElectronico:int}/anular-manualmente")]
+    public async Task<IActionResult> AnularManualmente(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, AnularManualmentePeticion peticion, CancellationToken cancellationToken)
+    {
+        var resultado = await anularManualmenteCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.Motivo, peticion.FechaAnulacion, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

@@ -53,6 +53,18 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, DateTime fecha, CancellationToken cancellationToken);
 
+    /// Marca un documento como AnuladoManualmente (15) — para cuando SUNAT ya muestra el documento como
+    /// anulado (p.ej. anulado directo en su portal) sin que este sistema haya tramitado esa baja por su
+    /// propia Comunicación de Baja. A diferencia de ActualizarEstadoSunatAsync (uso exclusivo del Worker,
+    /// refleja una respuesta real de SUNAT), este es el único camino para que un usuario registre
+    /// manualmente una anulación ya ocurrida — el SP valida elegibilidad (solo Aceptado/
+    /// AceptadoConObservaciones, sin otra anulación en curso o ya registrada) en vez de confiar ciegamente
+    /// en el llamador. fechaAnulacion es la fecha real en que ocurrió (normalmente se descubre después),
+    /// la decide el llamador — no "ahora".
+    Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
+        CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
