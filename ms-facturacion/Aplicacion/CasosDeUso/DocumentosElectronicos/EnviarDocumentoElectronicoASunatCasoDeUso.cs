@@ -245,17 +245,6 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         // archivos de este intento (xml/zip acá, cdr más abajo) para que se lean como un mismo conjunto.
         var nombreAlmacenamiento = $"{cabecera.Serie}-{cabecera.Correlativo}-{DateTime.UtcNow:yyyyMMddHHmmss}";
 
-        // Xml y Zip no dependen entre sí (cada uno ya tiene sus bytes calculados) — se suben a S3 + se
-        // registran en ARCHIVOS_DOCUMENTO en paralelo en vez de uno detrás del otro.
-        var archivoXmlTask = GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
-        var archivoZipTask = GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
-
-        await Task.WhenAll(archivoXmlTask, archivoZipTask);
-        var idArchivoXml = await archivoXmlTask;
-        var idArchivoZip = await archivoZipTask;
-
         // Reserva previa al envío, para los 4 tipos de documento: marca el documento como Enviando antes de
         // llamar a SUNAT, así un reintento concurrente del mismo documento (p.ej. un timeout del lado del
         // llamador que no cancela el procesamiento del lado del servidor) ve EstadoCodigo != PendienteEnvio
@@ -265,9 +254,10 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         // la Nota seguía PendienteEnvio. Para Nota de Crédito también revalida el saldo disponible: dos
         // borradores PendienteEnvio contra la misma Factura pueden pasar esa validación individualmente y
         // sobre-acreditar igual una vez que ambos se envían y SUNAT los acepta — la reserva hace que la
-        // segunda vea el saldo ya tomado. Se ubica acá, después de armar/firmar/subir XML+ZIP pero antes de
-        // registrar el intento de transmisión y de sendBill — el punto más tardío posible antes del envío
-        // real, sin dejar un intento de transmisión abierto si termina rechazado acá.
+        // segunda vea el saldo ya tomado. Se ubica acá, después de armar/firmar XML+ZIP pero antes de subir
+        // nada a S3 o registrar el intento de transmisión — el punto más tardío posible antes de cualquier
+        // efecto persistente, sin dejar ni una transmisión abierta ni Xml/Zip huérfanos si termina
+        // rechazado acá.
         var reserva = await documentoRepositorio.ValidarSaldoNotaCreditoAsync(UsuarioWorker, idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
         if (reserva.IdTipoMensaje != TipoMensaje.Exito)
         {
@@ -277,9 +267,11 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
+        // La transmisión se registra antes que sus propios archivos — ArchivoDocumento.IdTransmisionSunat
+        // necesita este id para vincularse (ver ALTER_TABLA_ArchivosDocumento_IdTransmisionSunat.sql).
         var nuevaTransmision = new NuevaTransmisionSunat(
             cabecera.IdDocumentoElectronico, null, configuracion.Datos.TipoProveedorCodigo,
-            configuracion.Datos.UrlEnvioFacturaBoletaNota, "sendBill", idArchivoZip, 1, idArchivoXml);
+            configuracion.Datos.UrlEnvioFacturaBoletaNota, "sendBill", 1);
 
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)
@@ -287,6 +279,15 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
             LogSiErrorSistema(transmision.IdTipoMensaje, transmision.Mensaje, idDocumentoElectronico, "falló al registrar el intento de transmisión");
             return new ResultadoOperacion<ResultadoEnvioSunat>(transmision.IdTipoMensaje, transmision.Mensaje, default);
         }
+
+        // Xml y Zip no dependen entre sí (cada uno ya tiene sus bytes calculados) — se suben a S3 + se
+        // registran en ARCHIVOS_DOCUMENTO en paralelo en vez de uno detrás del otro.
+        var archivoXmlTask = GuardarYRegistrarArchivoAsync(
+            idInquilino, cabecera.IdDocumentoElectronico, transmision.Datos, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
+        var archivoZipTask = GuardarYRegistrarArchivoAsync(
+            idInquilino, cabecera.IdDocumentoElectronico, transmision.Datos, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
+
+        await Task.WhenAll(archivoXmlTask, archivoZipTask);
 
         var envio = await sunatCliente.EnviarAsync(
             configuracion.Datos.UrlEnvioFacturaBoletaNota, usuarioSolCompleto, claveSolDescifrada.Datos, nombreArchivoZip, zipBytes, cancellationToken);
@@ -297,7 +298,7 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
 
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
 
             // ReglaDeNegocio = SUNAT sí respondió, solo que sin CDR usable (fault, HTTP de error, respuesta
@@ -343,20 +344,18 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         // firmados, no del registro del CDR en ARCHIVOS_DOCUMENTO) — mismo criterio que Xml/Zip arriba:
         // se disparan juntos en vez de esperar el CDR antes de siquiera empezar a construir el Pdf.
         var archivoCdrTask = GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
+            idInquilino, cabecera.IdDocumentoElectronico, transmision.Datos, carpeta, $"{nombreAlmacenamiento}.cdr", envio.Datos.CdrXmlBytes, "Cdr", "application/xml", cancellationToken);
 
         var archivoPdfTask = envio.Datos.EstadoCodigo is EstadoMaestroCodigo.Aceptado or EstadoMaestroCodigo.AceptadoConObservaciones
-            ? ConstruirYGuardarPdfAsync(idInquilino, cabecera, documento.Datos, empresa.Datos, sunatHash, carpeta, nombreAlmacenamiento, cancellationToken)
-            : Task.FromResult<int?>(null);
+            ? ConstruirYGuardarPdfAsync(idInquilino, cabecera, documento.Datos, empresa.Datos, sunatHash, transmision.Datos, carpeta, nombreAlmacenamiento, cancellationToken)
+            : Task.CompletedTask;
 
         await Task.WhenAll(archivoCdrTask, archivoPdfTask);
-        var idArchivoCdr = await archivoCdrTask;
-        var idArchivoPdf = await archivoPdfTask;
 
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
             new ResultadoTransmisionSunat(
-                envio.Datos.EstadoCodigo, idArchivoCdr, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, null, idArchivoPdf),
+                envio.Datos.EstadoCodigo, envio.Datos.SunatCodigoRespuesta, envio.Datos.SunatDescripcionRespuesta, null, null),
             cancellationToken);
 
         if (envio.Datos.EstadoCodigo != EstadoMaestroCodigo.Aceptado)
@@ -385,30 +384,30 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         return ResultadoOperacion<ResultadoEnvioSunat>.DeExito("Documento procesado por SUNAT.", envio.Datos);
     }
 
-    private async Task<int?> ConstruirYGuardarPdfAsync(
+    private async Task ConstruirYGuardarPdfAsync(
         int idInquilino, DocumentoElectronico cabecera, DocumentoElectronicoDetalle datosDocumento, Empresa empresa,
-        string? sunatHash, string carpeta, string nombreAlmacenamiento, CancellationToken cancellationToken)
+        string? sunatHash, int idTransmisionSunat, string carpeta, string nombreAlmacenamiento, CancellationToken cancellationToken)
     {
         var tokenPublico = await documentoRepositorio.ObtenerTokenPublicoAsync(idInquilino, cabecera.IdDocumentoElectronico, cancellationToken);
         if (tokenPublico.IdTipoMensaje != TipoMensaje.Exito || tokenPublico.Datos is null)
         {
-            return null;
+            return;
         }
 
         var pdfBytes = generadorPdf.Construir(datosDocumento, empresa, tokenPublico.Datos, sunatHash);
-        return await GuardarYRegistrarArchivoAsync(
-            idInquilino, cabecera.IdDocumentoElectronico, carpeta, $"{nombreAlmacenamiento}.pdf", pdfBytes, "Pdf", "application/pdf", cancellationToken);
+        await GuardarYRegistrarArchivoAsync(
+            idInquilino, cabecera.IdDocumentoElectronico, idTransmisionSunat, carpeta, $"{nombreAlmacenamiento}.pdf", pdfBytes, "Pdf", "application/pdf", cancellationToken);
     }
 
-    private async Task<int?> GuardarYRegistrarArchivoAsync(
-        int idInquilino, int idDocumentoElectronico, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
+    private async Task GuardarYRegistrarArchivoAsync(
+        int idInquilino, int idDocumentoElectronico, int idTransmisionSunat, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
         string tipoContenido, CancellationToken cancellationToken)
     {
         var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, contenido, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(contenido)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(
-            idDocumentoElectronico, null, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);
+            idDocumentoElectronico, null, idTransmisionSunat, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);
 
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
 
@@ -417,8 +416,6 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
         // si nada, dejando ARCHIVOS_DOCUMENTO desincronizado sin ningún rastro.
         LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idDocumentoElectronico,
             $"se guardó {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
-
-        return resultado.IdTipoMensaje == TipoMensaje.Exito ? resultado.Datos : null;
     }
 
     /// "Valor resumen" del QR (Anexo C, RS 113-2018/SUNAT) = ds:DigestValue del XML firmado, en base64 tal

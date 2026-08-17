@@ -18,7 +18,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken)
     {
         try
@@ -598,6 +598,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
                     lector.GetString(lector.GetOrdinal("MonedaCodigo")),
                     LeerNullableDecimal(lector, "TipoCambio"),
+                    LeerNullableString(lector, "EstadoAnulacionCodigo"),
                     LeerNullableDateOnly(lector, "FechaEmisionDocModificado"),
                     LeerNullableString(lector, "TipoDocumentoRelacionadoCodigo"),
                     LeerNullableString(lector, "SerieRelacionada"),
@@ -630,6 +631,45 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatTicket", (object?)sunatTicket ?? DBNull.Value);
             comando.Parameters.AddWithValue("@dtmFecha", fecha);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<EstadoDocumentoElectronicoActualizado>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var actualizado = new EstadoDocumentoElectronicoActualizado(
+                lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                lector.GetString(lector.GetOrdinal("EstadoCodigo")));
+
+            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeExito(mensaje, actualizado);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_AnularManualmente", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@vchMotivo", motivo);
+            comando.Parameters.AddWithValue("@dtmFechaAnulacion", fechaAnulacion);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -713,7 +753,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
-        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
+        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
     {
         try
@@ -777,7 +817,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
 
     public async Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarEstadoCuotaAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken)
+        EstadoCuotaCodigo estadoCuotaCodigo, DateTime? fechaPago, CancellationToken cancellationToken)
     {
         try
         {
@@ -789,6 +829,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
             comando.Parameters.AddWithValue("@intIdCuotaDocumentoElectronico", idCuotaDocumentoElectronico);
             comando.Parameters.AddWithValue("@intEstadoCuotaCodigo", (int)estadoCuotaCodigo);
+            comando.Parameters.AddWithValue("@dtmFechaPago", (object?)fechaPago ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -916,17 +957,21 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION.
-    private static DataTable ConstruirTablaCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronico> cuotas)
+    private static DataTable ConstruirTablaCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
     {
         var tabla = new DataTable();
         tabla.Columns.Add("IdCuotaDocumentoElectronico", typeof(int));
         tabla.Columns.Add("NumeroCuota", typeof(int));
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
+        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
+        tabla.Columns.Add("FechaPago", typeof(DateTime));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto);
+            tabla.Rows.Add(
+                cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
+                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
         }
 
         return tabla;
@@ -956,10 +1001,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetDecimal(lector.GetOrdinal("TotalLinea")));
 
     private static CuotaDocumentoElectronico LeerCuota(SqlDataReader lector) => new(
+        lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
         DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
         lector.GetDecimal(lector.GetOrdinal("Monto")),
-        lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")),
         lector.GetString(lector.GetOrdinal("EstadoCuotaCodigo")),
         lector.IsDBNull(lector.GetOrdinal("FechaPago")) ? null : lector.GetDateTime(lector.GetOrdinal("FechaPago")));
 
@@ -991,16 +1036,20 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO.
-    private static DataTable ConstruirTablaCuotas(IReadOnlyList<CuotaDocumentoElectronico> cuotas)
+    private static DataTable ConstruirTablaCuotas(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
     {
         var tabla = new DataTable();
         tabla.Columns.Add("NumeroCuota", typeof(int));
         tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
         tabla.Columns.Add("Monto", typeof(decimal));
+        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
+        tabla.Columns.Add("FechaPago", typeof(DateTime));
 
         foreach (var cuota in cuotas)
         {
-            tabla.Rows.Add(cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto);
+            tabla.Rows.Add(
+                cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
+                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
         }
 
         return tabla;

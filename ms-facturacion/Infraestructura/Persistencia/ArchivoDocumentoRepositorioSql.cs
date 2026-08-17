@@ -26,6 +26,7 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", (object?)archivo.IdDocumentoElectronico ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdLoteDocumento", (object?)archivo.IdLoteDocumento ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchTipoArchivoCodigo", archivo.TipoArchivoCodigo);
+            comando.Parameters.AddWithValue("@intIdTransmisionSunat", (object?)archivo.IdTransmisionSunat ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchNombreArchivo", archivo.NombreArchivo);
             comando.Parameters.AddWithValue("@vchRutaAlmacenamiento", archivo.RutaAlmacenamiento);
             comando.Parameters.AddWithValue("@vchTipoContenido", archivo.TipoContenido);

@@ -19,6 +19,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     ICifradoInquilinoServicio cifradoServicio,
     IAlmacenamientoArchivosServicio almacenamiento,
     IArchivoDocumentoRepositorio archivoRepositorio,
+    ITransmisionSunatRepositorio transmisionRepositorio,
     ISunatSummaryServiceCliente sunatCliente,
     IErrorDocumentoRepositorio errorRepositorio,
     IGeneradorPdfComprobanteServicio generadorPdf,
@@ -176,7 +177,27 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
 
         // 0: procesado — guardar CDR, cerrar lote/items/documentos con el resultado real.
         var carpeta = $"{idInquilino}/{cabecera.IdEmpresa}/{cabecera.FechaReferencia:yyyy}/{cabecera.FechaReferencia:MM}/baja-{cabecera.Nombre}";
-        await GuardarCdrAsync(idInquilino, idLoteDocumento, carpeta, cabecera.Nombre, consulta.Datos.CdrXmlBytes!, cancellationToken);
+
+        // getStatus es una llamada real a SUNAT que hasta ahora nunca quedaba registrada en
+        // TRANSMISIONES_SUNAT — se registra acá (mismo criterio "transmisión antes que sus archivos" que
+        // EnviarDocumentoElectronicoASunatCasoDeUso/EnviarComunicacionBajaASunatCasoDeUso) para que el CDR y
+        // el Pdf "ANULADO" regenerado por cada item se vinculen a ella en vez de quedar sin transmisión. Un
+        // fallo acá no debe bloquear la actualización real de lote/items/documentos — solo se loguea y se
+        // sigue con idTransmisionSunat = null.
+        int? idTransmisionSunat = null;
+        var nuevaTransmisionTicket = new NuevaTransmisionSunat(
+            null, idLoteDocumento, configuracion.Datos.TipoProveedorCodigo, configuracion.Datos.UrlEnvioFacturaBoletaNota, "getStatus", 1);
+        var transmisionTicket = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmisionTicket, cancellationToken);
+        if (transmisionTicket.IdTipoMensaje == TipoMensaje.Exito)
+        {
+            idTransmisionSunat = transmisionTicket.Datos;
+        }
+        else
+        {
+            LogSiErrorSistema(transmisionTicket.IdTipoMensaje, transmisionTicket.Mensaje, idLoteDocumento, "falló al registrar la transmisión de resolución de ticket (getStatus)");
+        }
+
+        await GuardarCdrAsync(idInquilino, idLoteDocumento, idTransmisionSunat, carpeta, cabecera.Nombre, consulta.Datos.CdrXmlBytes!, cancellationToken);
 
         await loteRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, idLoteDocumento, consulta.Datos.EstadoCodigo, cabecera.Ticket,
@@ -195,7 +216,16 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         await Task.WhenAll(lote.Datos.Items.Select(item => ProcesarItemBajaAsync(
             idInquilino, idLoteDocumento, item.IdDocumentoElectronico, consulta.Datos.EstadoCodigo,
             consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, ahora,
-            esAceptado, severidad, carpeta, empresa.Datos, cancellationToken)));
+            esAceptado, severidad, carpeta, empresa.Datos, idTransmisionSunat, cancellationToken)));
+
+        if (idTransmisionSunat is not null)
+        {
+            await transmisionRepositorio.ActualizarAsync(
+                UsuarioWorker, idInquilino, idTransmisionSunat.Value,
+                new ResultadoTransmisionSunat(
+                    consulta.Datos.EstadoCodigo, consulta.Datos.SunatCodigoRespuesta, consulta.Datos.SunatDescripcionRespuesta, null, null),
+                cancellationToken);
+        }
 
         return ResultadoOperacion<ResultadoConsultaTicket>.DeExito(consulta.Mensaje, consulta.Datos);
     }
@@ -204,14 +234,14 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     private async Task ProcesarItemBajaAsync(
         int idInquilino, int idLoteDocumento, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, DateTime ahora, bool esAceptado,
-        string severidad, string carpeta, Empresa empresa, CancellationToken cancellationToken)
+        string severidad, string carpeta, Empresa empresa, int? idTransmisionSunat, CancellationToken cancellationToken)
     {
         var actualizarTask = documentoRepositorio.ActualizarEstadoSunatAsync(
             UsuarioWorker, idInquilino, idDocumentoElectronico, estadoCodigo,
             null, sunatCodigoRespuesta, sunatDescripcionRespuesta, null, ahora, cancellationToken);
 
         var siguienteTask = esAceptado
-            ? RegenerarPdfAnuladoAsync(idInquilino, idLoteDocumento, idDocumentoElectronico, carpeta, empresa, cancellationToken)
+            ? RegenerarPdfAnuladoAsync(idInquilino, idLoteDocumento, idDocumentoElectronico, carpeta, empresa, idTransmisionSunat, cancellationToken)
             : errorRepositorio.InsertarAsync(
                 UsuarioWorker, idInquilino,
                 new ErrorDocumento(
@@ -224,13 +254,13 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     }
 
     private async Task GuardarCdrAsync(
-        int idInquilino, int idLoteDocumento, string carpeta, string nombreLote, byte[] cdrXmlBytes, CancellationToken cancellationToken)
+        int idInquilino, int idLoteDocumento, int? idTransmisionSunat, string carpeta, string nombreLote, byte[] cdrXmlBytes, CancellationToken cancellationToken)
     {
         var nombreArchivo = $"{nombreLote}-{DateTime.UtcNow:yyyyMMddHHmmss}.cdr";
         var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, cdrXmlBytes, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(cdrXmlBytes)).ToLowerInvariant();
 
-        var archivo = new ArchivoDocumento(null, idLoteDocumento, "Cdr", nombreArchivo, ruta, "application/xml", hash, cdrXmlBytes.LongLength);
+        var archivo = new ArchivoDocumento(null, idLoteDocumento, idTransmisionSunat, "Cdr", nombreArchivo, ruta, "application/xml", hash, cdrXmlBytes.LongLength);
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
         LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idLoteDocumento,
             $"se guardó {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
@@ -243,7 +273,8 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
     // documento ya quedó correctamente marcado ComunicacionBajaAceptada antes de llegar acá, así que un
     // problema al regenerar el PDF no debe tirar abajo el resultado real de la baja.
     private async Task RegenerarPdfAnuladoAsync(
-        int idInquilino, int idLoteDocumento, int idDocumentoElectronico, string carpeta, Empresa empresa, CancellationToken cancellationToken)
+        int idInquilino, int idLoteDocumento, int idDocumentoElectronico, string carpeta, Empresa empresa,
+        int? idTransmisionSunat, CancellationToken cancellationToken)
     {
         // documento y tokenPublico no dependen entre sí — ambos solo necesitan idInquilino/idDocumentoElectronico.
         var documentoTask = documentoRepositorio.ObtenerAsync(idInquilino, idDocumentoElectronico, cancellationToken);
@@ -273,7 +304,7 @@ public sealed class ConsultarTicketComunicacionBajaCasoDeUso(
         var hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(
-            idDocumentoElectronico, idLoteDocumento, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
+            idDocumentoElectronico, idLoteDocumento, idTransmisionSunat, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
         LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idLoteDocumento,
             $"se guardó el Pdf anulado de {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
