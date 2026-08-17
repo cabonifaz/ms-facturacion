@@ -67,7 +67,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     }
 
     public async Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarManualAsync(
-        string usuarioEjecutor, int idInquilino, int idEmpresa, int idDocumentoElectronico, string motivoDescripcion,
+        string usuarioEjecutor, int idInquilino, int idEmpresa, IReadOnlyList<ItemBajaEntrada> items,
         DateOnly fechaReferencia, DateTime fechaGeneracion, CancellationToken cancellationToken)
     {
         try
@@ -78,10 +78,20 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchMotivoDescripcion", motivoDescripcion);
             comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion);
+
+            var tabla = new DataTable();
+            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
+            tabla.Columns.Add("MotivoDescripcion", typeof(string));
+            foreach (var item in items)
+            {
+                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
+            }
+
+            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
+            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
+            tvpItems.Value = tabla;
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);

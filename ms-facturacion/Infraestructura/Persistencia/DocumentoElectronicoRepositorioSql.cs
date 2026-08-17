@@ -656,7 +656,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
-    public async Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+    public async Task<ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>> AnularManualmenteAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
         CancellationToken cancellationToken)
     {
@@ -677,21 +677,24 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
             if (idTipoMensaje != TipoMensaje.Exito)
             {
-                return new ResultadoOperacion<EstadoDocumentoElectronicoActualizado>(idTipoMensaje, mensaje, default);
+                return new ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>(idTipoMensaje, mensaje, default);
             }
 
             await lector.NextResultAsync(cancellationToken);
-            await lector.ReadAsync(cancellationToken);
 
-            var actualizado = new EstadoDocumentoElectronicoActualizado(
-                lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
-                lector.GetString(lector.GetOrdinal("EstadoCodigo")));
+            var afectados = new List<EstadoDocumentoElectronicoActualizado>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                afectados.Add(new EstadoDocumentoElectronicoActualizado(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo"))));
+            }
 
-            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeExito(mensaje, actualizado);
+            return ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>.DeExito(mensaje, afectados);
         }
         catch (Exception ex)
         {
-            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeErrorSistema(ex.Message);
+            return ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>.DeErrorSistema(ex.Message);
         }
     }
 
