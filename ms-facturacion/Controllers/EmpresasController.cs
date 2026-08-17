@@ -4,6 +4,10 @@ using ms_facturacion.Aplicacion.CasosDeUso.Empresas;
 
 namespace ms_facturacion.Controllers;
 
+// Deshabilitado — sin caller (ni maximlian3_backend ni ningún worker interno lo usa hoy; hay un TODO en
+// PedidoFacturaHandler para eventualmente resolver empresas desde acá, pero no está implementado todavía).
+// Comentado en vez de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+/*
 /// PaisCodigo = Num1 de TABLA_MAESTRA IdMaestro=2 (misma numeración que ya usa maximlian3_backend para
 /// identificar países), no el código ISO — se matchea por id, no por string.
 public sealed record InsertarEmpresaPeticion(
@@ -81,3 +85,4 @@ public sealed class EmpresasController(
         _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
+*/

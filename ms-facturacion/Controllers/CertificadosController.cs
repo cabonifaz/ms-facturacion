@@ -4,6 +4,9 @@ using ms_facturacion.Aplicacion.CasosDeUso.Certificados;
 
 namespace ms_facturacion.Controllers;
 
+// Deshabilitado — sin caller (ni maximlian3_backend ni ningún worker interno lo usa hoy). Comentado en vez
+// de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+/*
 public sealed record InsertarCertificadoPeticion(
     int IdInquilino, int IdEmpresa, string RutaAlmacenamiento, string Sujeto, string Emisor,
     string NumeroSerie, string HuellaDigital, DateOnly ValidoDesde, DateOnly ValidoHasta, bool Activo);
@@ -77,3 +80,4 @@ public sealed class CertificadosController(
         _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
+*/

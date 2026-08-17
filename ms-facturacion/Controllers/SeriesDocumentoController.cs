@@ -4,6 +4,10 @@ using ms_facturacion.Aplicacion.CasosDeUso.SeriesDocumento;
 
 namespace ms_facturacion.Controllers;
 
+// Deshabilitado — sin caller (ni maximlian3_backend ni ningún worker interno lo usa hoy: las series se
+// resuelven internamente vía SP al insertar un documento, no por un llamado HTTP distinto). Comentado en
+// vez de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+/*
 public sealed record InsertarSerieDocumentoPeticion(
     int IdInquilino, int IdEmpresa, int IdTipoDocumentoMaestro, string Serie, int NumeroActual, bool Activo);
 
@@ -75,3 +79,4 @@ public sealed class SeriesDocumentoController(
         _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
+*/
