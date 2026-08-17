@@ -68,7 +68,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
 
     public async Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarBajaAsync(
         int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
-        IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken)
+        IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
     {
         try
         {
@@ -80,12 +80,14 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
             comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
+            // MotivoDescripcion es NOT NULL en TVP_ITEM_LOTE_DOCUMENTO_BAJA (mismo tipo que InsertarAsync),
+            // pero SP_LoteDocumento_PrevisualizarBaja nunca lo lee — placeholder solo para cumplir el shape.
             var tabla = new DataTable();
             tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
             tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var item in items)
+            foreach (var id in idsDocumentoElectronico)
             {
-                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
+                tabla.Rows.Add(id, string.Empty);
             }
 
             var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);

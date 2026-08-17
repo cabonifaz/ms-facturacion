@@ -37,16 +37,17 @@ public sealed class LotesDocumentoController(
     }
 
     // Previsualiza ComunicacionBaja sin ejecutar nada — mismas validaciones y, de poder enviarse, la lista
-    // de documentos que se verían incluidos (los indicados + las Notas vigentes que se arrastrarían).
-    [HttpPost("comunicacion-baja/preview")]
-    public async Task<IActionResult> PrevisualizarComunicacionBaja(ComunicacionBajaPeticion peticion, CancellationToken cancellationToken)
+    // de documentos que se verían incluidos (los indicados + las Notas vigentes que se arrastrarían). Sin
+    // MotivoDescripcion por ítem (a diferencia de ComunicacionBajaPeticion) — la previsualización nunca lo
+    // lee (SP_LoteDocumento_PrevisualizarBaja no lo necesita para ninguna validación), así que el payload
+    // que queda es solo escalares + una lista de ids, entra entero en query string — GET, no POST.
+    [HttpGet("comunicacion-baja/preview")]
+    public async Task<IActionResult> PrevisualizarComunicacionBaja(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly fechaReferencia,
+        [FromQuery] IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
     {
-        var items = peticion.Items
-            .Select(item => new ItemBajaEntrada(item.IdDocumentoElectronico, item.MotivoDescripcion))
-            .ToList();
-
         var resultado = await previsualizarBajaCasoDeUso.EjecutarAsync(
-            peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, cancellationToken);
+            idInquilino, idEmpresa, fechaReferencia, idsDocumentoElectronico, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

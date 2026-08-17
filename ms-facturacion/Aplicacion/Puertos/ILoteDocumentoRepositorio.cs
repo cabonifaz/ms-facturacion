@@ -12,11 +12,12 @@ public interface ILoteDocumentoRepositorio
     /// Solo lectura — corre las mismas validaciones que InsertarAsync (ítems elegibles, sin Nota de Crédito/
     /// Débito vigente con desenlace todavía desconocido, plazo de 7 días, FechaEmision compartida, etc.) sin
     /// escribir nada, para que el llamador sepa de antemano si la Comunicación de Baja va a poder enviarse y
-    /// qué documentos incluiría (los indicados + las Notas vigentes que se arrastrarían). Ver
+    /// qué documentos incluiría (los indicados + las Notas vigentes que se arrastrarían). A diferencia de
+    /// InsertarAsync no pide MotivoDescripcion por documento — la validación nunca lo lee. Ver
     /// SP_LoteDocumento_PrevisualizarBaja.
     Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarBajaAsync(
         int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
-        IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken);
+        IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken);
 
     /// Lote (TipoLoteCodigo='AnulacionManual') para el documento anulado manualmente + toda Nota de
     /// Crédito/Débito vigente arrastrada con él (ver IDocumentoElectronicoRepositorio.AnularManualmenteAsync),
