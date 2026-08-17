@@ -698,6 +698,47 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>> PrevisualizarAnulacionManualAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_PrevisualizarAnulacionManual", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+
+            var afectados = new List<DocumentoAnulacionManualPreview>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                afectados.Add(new DocumentoAnulacionManualPreview(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("NumeroDocumento")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>.DeExito(mensaje, afectados);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken)

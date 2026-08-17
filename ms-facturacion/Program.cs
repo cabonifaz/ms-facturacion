@@ -109,6 +109,7 @@ builder.Services.AddScoped<ObtenerParaNotaCasoDeUso>();
 builder.Services.AddScoped<ObtenerResumenFacturacionCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoSunatDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<AnularManualmenteDocumentoElectronicoCasoDeUso>();
+builder.Services.AddScoped<PrevisualizarAnulacionManualCasoDeUso>();
 builder.Services.AddScoped<EnviarDocumentoElectronicoASunatCasoDeUso>();
 builder.Services.AddScoped<GuardarCambiosDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso>();

@@ -67,6 +67,13 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
         CancellationToken cancellationToken);
 
+    /// Solo lectura — corre las mismas validaciones que AnularManualmenteAsync (documento elegible, sin Nota
+    /// de Crédito/Débito vigente con desenlace todavía desconocido) sin escribir nada, para que el llamador
+    /// sepa de antemano si la anulación manual va a poder ejecutarse y qué documentos afectaría (el propio +
+    /// las Notas vigentes que se arrastrarían). Ver SP_DocumentoElectronico_PrevisualizarAnulacionManual.
+    Task<ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>> PrevisualizarAnulacionManualAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
