@@ -13,10 +13,11 @@ public interface ILoteDocumentoRepositorio
     /// Débito vigente con desenlace todavía desconocido, plazo de 7 días, FechaEmision compartida, etc.) sin
     /// escribir nada, para que el llamador sepa de antemano si la Comunicación de Baja va a poder enviarse y
     /// qué documentos incluiría (los indicados + las Notas vigentes que se arrastrarían). A diferencia de
-    /// InsertarAsync no pide MotivoDescripcion por documento — la validación nunca lo lee. Ver
-    /// SP_LoteDocumento_PrevisualizarBaja.
+    /// InsertarAsync no pide MotivoDescripcion por documento (la validación nunca lo lee) ni fechaReferencia
+    /// (el chequeo de fecha compartida compara las FechaEmision de los documentos entre sí, resuelta acá
+    /// mismo). Ver SP_LoteDocumento_PrevisualizarBaja.
     Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarBajaAsync(
-        int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
+        int idInquilino, int idEmpresa, DateOnly fechaGeneracion,
         IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken);
 
     /// Lote (TipoLoteCodigo='AnulacionManual') para el documento anulado manualmente + toda Nota de

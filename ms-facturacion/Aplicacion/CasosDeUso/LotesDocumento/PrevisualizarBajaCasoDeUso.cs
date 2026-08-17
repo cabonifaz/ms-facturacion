@@ -8,10 +8,9 @@ namespace ms_facturacion.Aplicacion.CasosDeUso.LotesDocumento;
 public sealed class PrevisualizarBajaCasoDeUso(ILoteDocumentoRepositorio loteRepositorio)
 {
     public Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> EjecutarAsync(
-        int idInquilino, int idEmpresa, DateOnly fechaReferencia, IReadOnlyList<int> idsDocumentoElectronico,
-        CancellationToken cancellationToken)
+        int idInquilino, int idEmpresa, IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
     {
         var fechaGeneracion = DateOnly.FromDateTime(RelojPeru.Ahora());
-        return loteRepositorio.PrevisualizarBajaAsync(idInquilino, idEmpresa, fechaReferencia, fechaGeneracion, idsDocumentoElectronico, cancellationToken);
+        return loteRepositorio.PrevisualizarBajaAsync(idInquilino, idEmpresa, fechaGeneracion, idsDocumentoElectronico, cancellationToken);
     }
 }

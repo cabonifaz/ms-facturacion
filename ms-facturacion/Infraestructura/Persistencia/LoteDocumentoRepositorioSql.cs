@@ -67,7 +67,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     }
 
     public async Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarBajaAsync(
-        int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
+        int idInquilino, int idEmpresa, DateOnly fechaGeneracion,
         IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
     {
         try
@@ -77,7 +77,6 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
 
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
             comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
             // MotivoDescripcion es NOT NULL en TVP_ITEM_LOTE_DOCUMENTO_BAJA (mismo tipo que InsertarAsync),
