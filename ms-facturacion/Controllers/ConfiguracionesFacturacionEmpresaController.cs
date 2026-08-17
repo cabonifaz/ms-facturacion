@@ -4,6 +4,9 @@ using ms_facturacion.Aplicacion.CasosDeUso.ConfiguracionesFacturacionEmpresa;
 
 namespace ms_facturacion.Controllers;
 
+// Deshabilitado — sin caller (ni maximlian3_backend ni ningún worker interno lo usa hoy). Comentado en vez
+// de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+/*
 public sealed record InsertarConfiguracionFacturacionEmpresaPeticion(
     int IdInquilino, int IdEmpresa, string AmbienteCodigo, string TipoProveedorCodigo, string? NombreProveedor,
     int IdCertificado, string? UrlEnvioFacturaBoletaNota, string? UrlEnvioRetencionPercepcion,
@@ -93,3 +96,4 @@ public sealed class ConfiguracionesFacturacionEmpresaController(
         _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
+*/

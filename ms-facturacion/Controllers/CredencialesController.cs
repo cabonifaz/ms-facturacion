@@ -34,6 +34,9 @@ public sealed class CredencialesController(
         return ResponderSegunEnvelope(resultado);
     }
 
+    // Deshabilitado — sin caller (solo Insertar está en uso; Obtener/Listar/Actualizar/Eliminar quedan
+    // comentados para retomarlos en un sprint futuro sin tener que reescribirlos).
+    /*
     [HttpGet("{idCredencialInquilino:int}")]
     public async Task<IActionResult> Obtener(
         [FromQuery] int idInquilino, int idCredencialInquilino, CancellationToken cancellationToken)
@@ -69,6 +72,7 @@ public sealed class CredencialesController(
         var resultado = await eliminarCasoDeUso.EjecutarAsync(UsuarioEjecutor, idInquilino, idCredencialInquilino, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
+    */
 
     private IActionResult ResponderSegunEnvelope<T>(ResultadoOperacion<T> resultado) => resultado.IdTipoMensaje switch
     {

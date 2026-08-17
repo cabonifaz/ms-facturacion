@@ -4,6 +4,9 @@ using ms_facturacion.Aplicacion.CasosDeUso.Inquilinos;
 
 namespace ms_facturacion.Controllers;
 
+// Deshabilitado — sin caller (ni maximlian3_backend ni ningún worker interno lo usa hoy). Comentado en vez
+// de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+/*
 public sealed record InsertarInquilinoPeticion(string Codigo, string Nombre, bool Activo);
 public sealed record ActualizarInquilinoPeticion(string Codigo, string Nombre, bool Activo);
 
@@ -68,3 +71,4 @@ public sealed class InquilinosController(
         _ => StatusCode(StatusCodes.Status500InternalServerError, new { IdTipoMensaje = (int)resultado.IdTipoMensaje, resultado.Mensaje })
     };
 }
+*/
