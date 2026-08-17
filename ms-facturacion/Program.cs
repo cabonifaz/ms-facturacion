@@ -146,6 +146,7 @@ builder.Services.AddScoped<EliminarConfiguracionFacturacionEmpresaCasoDeUso>();
 
 // Casos de Uso — LoteDocumento (Comunicación de Baja)
 builder.Services.AddScoped<EnviarComunicacionBajaASunatCasoDeUso>();
+builder.Services.AddScoped<PrevisualizarBajaCasoDeUso>();
 builder.Services.AddScoped<ConsultarTicketComunicacionBajaCasoDeUso>();
 builder.Services.AddScoped<ResolverTicketsPendientesCasoDeUso>();
 

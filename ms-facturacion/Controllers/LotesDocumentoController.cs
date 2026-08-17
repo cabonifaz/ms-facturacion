@@ -14,6 +14,7 @@ public sealed record ComunicacionBajaPeticion(
 [Route("api/v1/lotes-documento")]
 public sealed class LotesDocumentoController(
     EnviarComunicacionBajaASunatCasoDeUso enviarBajaCasoDeUso,
+    PrevisualizarBajaCasoDeUso previsualizarBajaCasoDeUso,
     ConsultarTicketComunicacionBajaCasoDeUso consultarTicketCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
@@ -31,6 +32,21 @@ public sealed class LotesDocumentoController(
         var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await enviarBajaCasoDeUso.EjecutarAsync(
             peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, ambienteCodigo, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Previsualiza ComunicacionBaja sin ejecutar nada — mismas validaciones y, de poder enviarse, la lista
+    // de documentos que se verían incluidos (los indicados + las Notas vigentes que se arrastrarían).
+    [HttpPost("comunicacion-baja/preview")]
+    public async Task<IActionResult> PrevisualizarComunicacionBaja(ComunicacionBajaPeticion peticion, CancellationToken cancellationToken)
+    {
+        var items = peticion.Items
+            .Select(item => new ItemBajaEntrada(item.IdDocumentoElectronico, item.MotivoDescripcion))
+            .ToList();
+
+        var resultado = await previsualizarBajaCasoDeUso.EjecutarAsync(
+            peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
