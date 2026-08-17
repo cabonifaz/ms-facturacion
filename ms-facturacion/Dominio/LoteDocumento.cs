@@ -21,3 +21,11 @@ public sealed record LoteDocumentoCreado(int IdLoteDocumento, string Nombre, str
 public sealed record LotePendienteTicket(int IdInquilino, int IdLoteDocumento, string? Ticket);
 
 public sealed record ResultadoResolucionTicket(int IdInquilino, int IdLoteDocumento, bool Exito, string Mensaje);
+
+/// Fila de SP_LoteDocumento_PrevisualizarBaja — un documento que se vería incluido (uno de los indicados, o
+/// una Nota de Crédito/Débito vigente que se arrastraría con su Factura/Boleta) si se ejecutara
+/// SP_LoteDocumento_Insertar ahora mismo. EstadoCodigo es el estado ACTUAL del documento — todavía no
+/// cambió nada, esto es solo una previsualización.
+public sealed record DocumentoBajaPreview(
+    int IdDocumentoElectronico, string TipoDocumentoCodigo, string NumeroDocumento,
+    DateOnly FechaEmision, string EstadoCodigo);

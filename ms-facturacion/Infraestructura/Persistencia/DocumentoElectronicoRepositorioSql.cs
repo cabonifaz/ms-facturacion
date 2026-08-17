@@ -656,7 +656,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
-    public async Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+    public async Task<ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>> AnularManualmenteAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
         CancellationToken cancellationToken)
     {
@@ -677,21 +677,65 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
             if (idTipoMensaje != TipoMensaje.Exito)
             {
-                return new ResultadoOperacion<EstadoDocumentoElectronicoActualizado>(idTipoMensaje, mensaje, default);
+                return new ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>(idTipoMensaje, mensaje, default);
             }
 
             await lector.NextResultAsync(cancellationToken);
-            await lector.ReadAsync(cancellationToken);
 
-            var actualizado = new EstadoDocumentoElectronicoActualizado(
-                lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
-                lector.GetString(lector.GetOrdinal("EstadoCodigo")));
+            var afectados = new List<EstadoDocumentoElectronicoActualizado>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                afectados.Add(new EstadoDocumentoElectronicoActualizado(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo"))));
+            }
 
-            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeExito(mensaje, actualizado);
+            return ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>.DeExito(mensaje, afectados);
         }
         catch (Exception ex)
         {
-            return ResultadoOperacion<EstadoDocumentoElectronicoActualizado>.DeErrorSistema(ex.Message);
+            return ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>> PrevisualizarAnulacionManualAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_PrevisualizarAnulacionManual", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+
+            var afectados = new List<DocumentoAnulacionManualPreview>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                afectados.Add(new DocumentoAnulacionManualPreview(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("NumeroDocumento")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>.DeExito(mensaje, afectados);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>.DeErrorSistema(ex.Message);
         }
     }
 

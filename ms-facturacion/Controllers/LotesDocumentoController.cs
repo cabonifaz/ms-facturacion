@@ -14,6 +14,7 @@ public sealed record ComunicacionBajaPeticion(
 [Route("api/v1/lotes-documento")]
 public sealed class LotesDocumentoController(
     EnviarComunicacionBajaASunatCasoDeUso enviarBajaCasoDeUso,
+    PrevisualizarBajaCasoDeUso previsualizarBajaCasoDeUso,
     ConsultarTicketComunicacionBajaCasoDeUso consultarTicketCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
@@ -31,6 +32,22 @@ public sealed class LotesDocumentoController(
         var ambienteCodigo = entorno.IsDevelopment() || entorno.IsStaging() ? "Beta" : "Produccion";
         var resultado = await enviarBajaCasoDeUso.EjecutarAsync(
             peticion.IdInquilino, peticion.IdEmpresa, peticion.FechaReferencia, items, ambienteCodigo, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Previsualiza ComunicacionBaja sin ejecutar nada — mismas validaciones y, de poder enviarse, la lista
+    // de documentos que se verían incluidos (los indicados + las Notas vigentes que se arrastrarían). Sin
+    // MotivoDescripcion por ítem ni FechaReferencia (a diferencia de ComunicacionBajaPeticion) — ninguno de
+    // los dos hace falta para la validación (MotivoDescripcion nunca se lee; el chequeo de fecha compartida
+    // compara las FechaEmision de los documentos entre sí, no contra un valor mandado por el llamador), así
+    // que el payload que queda es solo escalares + una lista de ids, entra entero en query string.
+    [HttpGet("comunicacion-baja/preview")]
+    public async Task<IActionResult> PrevisualizarComunicacionBaja(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa,
+        [FromQuery] IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await previsualizarBajaCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, idsDocumentoElectronico, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
