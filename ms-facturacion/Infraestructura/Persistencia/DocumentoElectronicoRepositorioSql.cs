@@ -165,6 +165,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 lineas.Add(new LineaDocumentoElectronico(
                     lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+                    LeerNullableInt(lector, "IdPedido"),
                     lector.GetString(lector.GetOrdinal("ProductoCodigo")),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
@@ -795,7 +796,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     }
 
     public async Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string idExterno, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken)
@@ -808,6 +809,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@vchIdExterno", idExterno);
             comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
@@ -1021,9 +1023,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         return tabla;
     }
 
+    // IdPedido: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
+    // SP_DocumentoElectronico_Obtener) — el llamador ya lo mandó en la misma request que generó estas
+    // líneas, no hace falta que el SP se lo confirme de vuelta.
     private static LineaDocumentoElectronico LeerLinea(SqlDataReader lector) => new(
         lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
+        null,
         lector.GetString(lector.GetOrdinal("ProductoCodigo")),
         LeerNullableString(lector, "ProductoSunatCodigo"),
         lector.GetString(lector.GetOrdinal("Descripcion")),

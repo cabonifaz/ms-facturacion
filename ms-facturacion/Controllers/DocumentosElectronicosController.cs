@@ -47,7 +47,7 @@ public sealed record CuotaEdicionPeticion(
 public sealed record CampoExtraEdicionPeticion(string Texto, int IdCampoExtraDocumentoElectronico = 0);
 
 public sealed record GuardarCambiosDocumentoElectronicoPeticion(
-    int? IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
+    string IdExterno, int? IdFormaPago, string? NumeroReferencia, int IdMonedaMaestro, decimal? TipoCambio, int IdTipoOperacionMaestro,
     IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
     IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null, int? IdMotivoMaestro = null);
 
@@ -144,7 +144,7 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var resultado = await guardarCambiosCasoDeUso.EjecutarAsync(
-            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdFormaPago, peticion.NumeroReferencia,
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.IdExterno, peticion.IdFormaPago, peticion.NumeroReferencia,
             peticion.IdMonedaMaestro, peticion.TipoCambio, peticion.IdTipoOperacionMaestro, peticion.IdMotivoMaestro,
             lineas, cuotas, camposExtra, cancellationToken);
         return ResponderSegunEnvelope(resultado);
