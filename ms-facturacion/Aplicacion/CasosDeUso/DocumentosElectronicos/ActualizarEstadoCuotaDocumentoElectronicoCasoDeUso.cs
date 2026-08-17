@@ -8,7 +8,7 @@ public sealed class ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso(IDocument
 {
     public Task<ResultadoOperacion<CuotaDocumentoElectronico>> EjecutarAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken) =>
+        EstadoCuotaCodigo estadoCuotaCodigo, DateTime? fechaPago, CancellationToken cancellationToken) =>
         repositorio.ActualizarEstadoCuotaAsync(
-            usuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico, estadoCuotaCodigo, cancellationToken);
+            usuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico, estadoCuotaCodigo, fechaPago, cancellationToken);
 }

@@ -19,5 +19,6 @@ public enum EstadoMaestroCodigo
     ConsultandoTicket = 11,
     TicketConError = 12,
     ComunicacionBajaRechazada = 13,
-    ComunicacionBajaConError = 14
+    ComunicacionBajaConError = 14,
+    AnuladoManualmente = 15
 }

@@ -10,7 +10,7 @@ public interface IDocumentoElectronicoRepositorio
         int idTipoDocumentoMaestro, DateOnly fechaEmision, TimeOnly horaEmision,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idFormaPago, ClienteDatosEntrada cliente,
         DocumentoAfectadoEntrada? documentoAfectado, IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas,
-        IReadOnlyList<CuotaDocumentoElectronico> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
+        IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas, IReadOnlyList<CampoExtraEntrada> camposExtra,
         CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<DocumentoElectronicoDetalle>> ObtenerAsync(
@@ -53,6 +53,18 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, EstadoMaestroCodigo estadoCodigo, string? sunatHash,
         string? sunatCodigoRespuesta, string? sunatDescripcionRespuesta, string? sunatTicket, DateTime fecha, CancellationToken cancellationToken);
 
+    /// Marca un documento como AnuladoManualmente (15) — para cuando SUNAT ya muestra el documento como
+    /// anulado (p.ej. anulado directo en su portal) sin que este sistema haya tramitado esa baja por su
+    /// propia Comunicación de Baja. A diferencia de ActualizarEstadoSunatAsync (uso exclusivo del Worker,
+    /// refleja una respuesta real de SUNAT), este es el único camino para que un usuario registre
+    /// manualmente una anulación ya ocurrida — el SP valida elegibilidad (solo Aceptado/
+    /// AceptadoConObservaciones, sin otra anulación en curso o ya registrada) en vez de confiar ciegamente
+    /// en el llamador. fechaAnulacion es la fecha real en que ocurrió (normalmente se descubre después),
+    /// la decide el llamador — no "ahora".
+    Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
+        CancellationToken cancellationToken);
+
     Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
@@ -75,14 +87,16 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
-        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronico> cuotas,
+        IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
 
     /// Marca el estado de pago de una cuota (Pendiente/Pagado) — transición independiente del EstadoCodigo
-    /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT.
+    /// del documento, puede ocurrir mucho después de que el documento ya fue aceptado por SUNAT. fechaPago
+    /// debe ser coherente con estadoCuotaCodigo: NULL si Pendiente, obligatoria si Pagado (permite registrar
+    /// la fecha real de un pago pasado, no siempre "ahora").
     Task<ResultadoOperacion<CuotaDocumentoElectronico>> ActualizarEstadoCuotaAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int idCuotaDocumentoElectronico,
-        EstadoCuotaCodigo estadoCuotaCodigo, CancellationToken cancellationToken);
+        EstadoCuotaCodigo estadoCuotaCodigo, DateTime? fechaPago, CancellationToken cancellationToken);
 
     /// Para que maximlian3_backend sincronice PEDIDO_FACTURA sondeando EVENTOS_DOCUMENTO desde un checkpoint
     /// (IdEventoDocumento, monótono — sin comparar fechas). EsAnulacion distingue un Rechazado de sendBill de

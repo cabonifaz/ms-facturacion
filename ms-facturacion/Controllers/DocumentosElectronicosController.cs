@@ -6,7 +6,7 @@ using ms_facturacion.Dominio;
 namespace ms_facturacion.Controllers;
 
 public sealed record FormaPagoPeticion(int? IdFormaPago, IReadOnlyList<CuotaPeticion>? Cuotas);
-public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto);
+public sealed record CuotaPeticion(int NumeroCuota, DateOnly FechaVencimiento, decimal Monto, int IdEstadoCuotaMaestro, DateTime? FechaPago);
 public sealed record ClientePeticion(
     int IdTipoDocumentoSunat, string NumeroDocumento, string? Nombre, string? Correo, string? Direccion, int PaisCodigo);
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
@@ -25,6 +25,11 @@ public sealed record InsertarDocumentoElectronicoPeticion(
 public sealed record ActualizarEstadoSunatPeticion(
     EstadoMaestroCodigo EstadoCodigo, string? SunatHash, string? SunatCodigoRespuesta, string? SunatDescripcionRespuesta, string? SunatTicket);
 
+/// FechaAnulacion es la fecha real en que ocurrió la anulación en SUNAT (normalmente se descubre después
+/// de que pasó) — no se resuelve con RelojPeru.Ahora() como el resto de fechas server-authoritative de este
+/// controller, porque acá el llamador sí conoce el dato real y no "ahora".
+public sealed record AnularManualmentePeticion(string Motivo, DateTime FechaAnulacion);
+
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
@@ -34,7 +39,8 @@ public sealed record LineaEdicionPeticion(
 
 /// Cuota dentro de "Guardar cambios" en lote — mismo criterio de IdCuotaDocumentoElectronico que LineaEdicionPeticion.
 public sealed record CuotaEdicionPeticion(
-    DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdCuotaDocumentoElectronico = 0);
+    DateOnly FechaVencimiento, decimal Monto, int NumeroCuota, int IdEstadoCuotaMaestro, DateTime? FechaPago,
+    int IdCuotaDocumentoElectronico = 0);
 
 /// Campo extra dentro de "Guardar cambios" en lote — mismo criterio de IdCampoExtraDocumentoElectronico
 /// que LineaEdicionPeticion/CuotaEdicionPeticion.
@@ -45,7 +51,7 @@ public sealed record GuardarCambiosDocumentoElectronicoPeticion(
     IReadOnlyList<LineaEdicionPeticion> Lineas, IReadOnlyList<CuotaEdicionPeticion> Cuotas,
     IReadOnlyList<CampoExtraEdicionPeticion>? CamposExtra = null, int? IdMotivoMaestro = null);
 
-public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo);
+public sealed record ActualizarEstadoCuotaPeticion(EstadoCuotaCodigo EstadoCuotaCodigo, DateTime? FechaPago);
 
 [ApiController]
 [Route("api/v1/documentos-electronicos")]
@@ -57,6 +63,7 @@ public sealed class DocumentosElectronicosController(
     ListarDocumentosParaSireRvieCasoDeUso listarParaSireRvieCasoDeUso,
     GenerarTxtSireRvieCasoDeUso generarTxtSireRvieCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
+    AnularManualmenteDocumentoElectronicoCasoDeUso anularManualmenteCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
@@ -92,7 +99,8 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var cuotas = (peticion.FormaPago?.Cuotas ?? [])
-            .Select(cuota => new CuotaDocumentoElectronico(cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto))
+            .Select(cuota => new CuotaDocumentoElectronicoEntrada(
+                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdEstadoCuotaMaestro, cuota.FechaPago))
             .ToList();
 
         var camposExtra = (peticion.CamposExtra ?? [])
@@ -125,8 +133,9 @@ public sealed class DocumentosElectronicosController(
             .ToList();
 
         var cuotas = peticion.Cuotas
-            .Select(cuota => new CuotaDocumentoElectronico(
-                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdCuotaDocumentoElectronico))
+            .Select(cuota => new CuotaDocumentoElectronicoEntrada(
+                cuota.NumeroCuota, cuota.FechaVencimiento, cuota.Monto, cuota.IdEstadoCuotaMaestro, cuota.FechaPago,
+                cuota.IdCuotaDocumentoElectronico))
             .ToList();
 
         var camposExtra = (peticion.CamposExtra ?? [])
@@ -149,7 +158,7 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await actualizarEstadoCuotaCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, idCuotaDocumentoElectronico,
-            peticion.EstadoCuotaCodigo, cancellationToken);
+            peticion.EstadoCuotaCodigo, peticion.FechaPago, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 
@@ -283,6 +292,19 @@ public sealed class DocumentosElectronicosController(
         var resultado = await actualizarEstadoSunatCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.EstadoCodigo, peticion.SunatHash,
             peticion.SunatCodigoRespuesta, peticion.SunatDescripcionRespuesta, peticion.SunatTicket, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Para cuando el usuario descubre que SUNAT ya muestra el documento como anulado sin que este sistema
+    // haya tramitado esa baja (p.ej. anulado directo en el portal de SUNAT) — registra esa anulación acá,
+    // con motivo y la fecha real en que ocurrió.
+    [HttpPut("{idDocumentoElectronico:int}/anular-manualmente")]
+    public async Task<IActionResult> AnularManualmente(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, AnularManualmentePeticion peticion, CancellationToken cancellationToken)
+    {
+        var resultado = await anularManualmenteCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.Motivo, peticion.FechaAnulacion, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

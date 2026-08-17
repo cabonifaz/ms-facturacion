@@ -147,19 +147,14 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         var idLoteDocumento = lote.Datos.Cabecera.IdLoteDocumento;
         var carpeta = $"{idInquilino}/{idEmpresa}/{fechaReferencia:yyyy}/{fechaReferencia:MM}/baja-{lote.Datos.Cabecera.Nombre}";
         var nombreAlmacenamiento = $"{lote.Datos.Cabecera.Nombre}-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        // Xml y Zip no dependen entre sí (mismo criterio que EnviarDocumentoElectronicoASunatCasoDeUso).
-        var archivoXmlTask = GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
-        var archivoZipTask = GuardarArchivoAsync(idInquilino, idLoteDocumento, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
-
-        await Task.WhenAll(archivoXmlTask, archivoZipTask);
-        var idArchivoXml = await archivoXmlTask;
-        var idArchivoZip = await archivoZipTask;
 
         var usuarioSolCompleto = empresa.Datos.Ruc + claveSol.Datos.Usuario;
 
+        // La transmisión se registra antes que sus propios archivos — mismo criterio que
+        // EnviarDocumentoElectronicoASunatCasoDeUso.
         var nuevaTransmision = new NuevaTransmisionSunat(
             null, idLoteDocumento, configuracion.Datos.TipoProveedorCodigo, configuracion.Datos.UrlEnvioFacturaBoletaNota,
-            "sendSummary", idArchivoZip, 1, idArchivoXml);
+            "sendSummary", 1);
 
         var transmision = await transmisionRepositorio.InsertarAsync(UsuarioWorker, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)
@@ -167,6 +162,12 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
             LogSiErrorSistema(transmision.IdTipoMensaje, transmision.Mensaje, idLoteDocumento, "falló al registrar el intento de transmisión");
             return new ResultadoOperacion<LoteDocumentoCreado>(transmision.IdTipoMensaje, transmision.Mensaje, default);
         }
+
+        // Xml y Zip no dependen entre sí (mismo criterio que EnviarDocumentoElectronicoASunatCasoDeUso).
+        var archivoXmlTask = GuardarArchivoAsync(idInquilino, idLoteDocumento, transmision.Datos, carpeta, $"{nombreAlmacenamiento}.xml", xmlFirmado, "Xml", "application/xml", cancellationToken);
+        var archivoZipTask = GuardarArchivoAsync(idInquilino, idLoteDocumento, transmision.Datos, carpeta, $"{nombreAlmacenamiento}.zip", zipBytes, "Zip", "application/zip", cancellationToken);
+
+        await Task.WhenAll(archivoXmlTask, archivoZipTask);
 
         var envio = await sunatCliente.EnviarAsync(
             configuracion.Datos.UrlEnvioFacturaBoletaNota, usuarioSolCompleto, claveSolDescifrada.Datos, nombreArchivoZip, zipBytes, cancellationToken);
@@ -177,7 +178,7 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
 
             await transmisionRepositorio.ActualizarAsync(
                 UsuarioWorker, idInquilino, transmision.Datos,
-                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
+                new ResultadoTransmisionSunat(EstadoMaestroCodigo.ErrorSunat, null, null, envio.IdTipoMensaje.ToString(), envio.Mensaje),
                 cancellationToken);
 
             // ReglaDeNegocio = SUNAT sí respondió al sendSummary, solo que sin ticket usable — un fallo real,
@@ -212,7 +213,7 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
 
         await transmisionRepositorio.ActualizarAsync(
             UsuarioWorker, idInquilino, transmision.Datos,
-            new ResultadoTransmisionSunat(EstadoMaestroCodigo.TicketRecibido, null, null, null, null, null),
+            new ResultadoTransmisionSunat(EstadoMaestroCodigo.TicketRecibido, null, null, null, null),
             cancellationToken);
 
         await loteRepositorio.ActualizarEstadoSunatAsync(
@@ -235,21 +236,19 @@ public sealed class EnviarComunicacionBajaASunatCasoDeUso(
         return ResultadoOperacion<LoteDocumentoCreado>.DeExito($"Comunicación de baja enviada, ticket: {envio.Datos}.", resultado);
     }
 
-    private async Task<int> GuardarArchivoAsync(
-        int idInquilino, int idLoteDocumento, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
+    private async Task GuardarArchivoAsync(
+        int idInquilino, int idLoteDocumento, int idTransmisionSunat, string carpeta, string nombreArchivo, byte[] contenido, string tipoArchivoCodigo,
         string tipoContenido, CancellationToken cancellationToken)
     {
         var ruta = await almacenamiento.GuardarAsync(carpeta, nombreArchivo, contenido, cancellationToken);
         var hash = Convert.ToHexString(SHA256.HashData(contenido)).ToLowerInvariant();
 
-        var archivo = new ArchivoDocumento(null, idLoteDocumento, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);
+        var archivo = new ArchivoDocumento(null, idLoteDocumento, idTransmisionSunat, tipoArchivoCodigo, nombreArchivo, ruta, tipoContenido, hash, contenido.LongLength);
         var resultado = await archivoRepositorio.InsertarAsync(UsuarioWorker, idInquilino, archivo, cancellationToken);
 
         // No se propaga como falla del envío completo (el archivo ya está en S3) — pero antes esto se perdía
         // en silencio, mismo criterio que EnviarDocumentoElectronicoASunatCasoDeUso.GuardarYRegistrarArchivoAsync.
         LogSiErrorSistema(resultado.IdTipoMensaje, resultado.Mensaje, idLoteDocumento,
             $"se guardó {nombreArchivo} en S3 pero falló registrar el archivo en la base de datos");
-
-        return resultado.Datos;
     }
 }
