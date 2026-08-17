@@ -28,8 +28,6 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
             comando.Parameters.AddWithValue("@vchTipoProveedorCodigo", transmision.TipoProveedorCodigo);
             comando.Parameters.AddWithValue("@vchEndpoint", transmision.Endpoint);
             comando.Parameters.AddWithValue("@vchMetodo", transmision.Metodo);
-            comando.Parameters.AddWithValue("@intIdArchivoSolicitud", (object?)transmision.IdArchivoSolicitud ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdArchivoXml", (object?)transmision.IdArchivoXml ?? DBNull.Value);
             comando.Parameters.AddWithValue("@intNumeroIntento", transmision.NumeroIntento);
 
             await conexion.OpenAsync(cancellationToken);
@@ -66,8 +64,6 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
             comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
             comando.Parameters.AddWithValue("@intIdTransmisionSunat", idTransmisionSunat);
             comando.Parameters.AddWithValue("@intEstadoCodigo", (int)resultado.EstadoCodigo);
-            comando.Parameters.AddWithValue("@intIdArchivoRespuesta", (object?)resultado.IdArchivoRespuesta ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdArchivoPdf", (object?)resultado.IdArchivoPdf ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatCodigoEstado", (object?)resultado.SunatCodigoEstado ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchSunatMensajeEstado", (object?)resultado.SunatMensajeEstado ?? DBNull.Value);
             comando.Parameters.AddWithValue("@vchTipoError", (object?)resultado.TipoError ?? DBNull.Value);

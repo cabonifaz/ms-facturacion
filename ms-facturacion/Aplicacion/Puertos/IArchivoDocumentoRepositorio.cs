@@ -9,7 +9,7 @@ public interface IArchivoDocumentoRepositorio
         string usuarioEjecutor, int idInquilino, ArchivoDocumento archivo, CancellationToken cancellationToken);
 
     /// tipoArchivoCodigo: "Xml" o "Pdf" — resuelve contra el último intento de transmisión del documento
-    /// (TRANSMISIONES_SUNAT.IdArchivoXml/IdArchivoPdf), ver SP_ArchivoDocumento_ObtenerXmlYPdf.
+    /// (ARCHIVOS_DOCUMENTO.IdTransmisionSunat + TipoArchivoCodigo), ver SP_ArchivoDocumento_ObtenerXmlYPdf.
     Task<ResultadoOperacion<ArchivoDescarga>> ObtenerXmlOPdfAsync(
         int idInquilino, int idDocumentoElectronico, string tipoArchivoCodigo, CancellationToken cancellationToken);
 

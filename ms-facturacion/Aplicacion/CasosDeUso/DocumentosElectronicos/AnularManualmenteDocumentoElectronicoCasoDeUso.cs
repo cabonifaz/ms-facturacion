@@ -89,10 +89,10 @@ public sealed class AnularManualmenteDocumentoElectronicoCasoDeUso(
         }
 
         // Metodo='Manual': no hay una transmisión SOAP real a SUNAT detrás de esto (a diferencia de
-        // sendBill/sendSummary), pero se registra igual para que el Pdf tenga un IdArchivoPdf propio en vez
-        // de depender de "el más reciente por FchCre" — ver SP_ArchivoDocumento_ObtenerXmlYPdf.
+        // sendBill/sendSummary), pero se registra igual para que el Pdf tenga un IdTransmisionSunat propio
+        // en vez de depender de "el más reciente por FchCre" — ver SP_ArchivoDocumento_ObtenerXmlYPdf.
         var nuevaTransmision = new NuevaTransmisionSunat(
-            null, lote.Datos.IdLoteDocumento, "Manual", "N/A (anulación registrada manualmente)", "Manual", null, 1);
+            null, lote.Datos.IdLoteDocumento, "Manual", "N/A (anulación registrada manualmente)", "Manual", 1);
         var transmision = await transmisionRepositorio.InsertarAsync(usuarioEjecutor, idInquilino, nuevaTransmision, cancellationToken);
         if (transmision.IdTipoMensaje != TipoMensaje.Exito)
         {
@@ -108,7 +108,7 @@ public sealed class AnularManualmenteDocumentoElectronicoCasoDeUso(
         var hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
 
         var archivo = new ArchivoDocumento(
-            idDocumentoElectronico, lote.Datos.IdLoteDocumento, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
+            idDocumentoElectronico, lote.Datos.IdLoteDocumento, transmision.Datos, "Pdf", nombreArchivo, ruta, "application/pdf", hash, pdfBytes.LongLength);
         var archivoInsertado = await archivoRepositorio.InsertarAsync(usuarioEjecutor, idInquilino, archivo, cancellationToken);
         if (archivoInsertado.IdTipoMensaje != TipoMensaje.Exito)
         {
@@ -117,7 +117,7 @@ public sealed class AnularManualmenteDocumentoElectronicoCasoDeUso(
         }
 
         var resultadoTransmision = new ResultadoTransmisionSunat(
-            EstadoMaestroCodigo.AnuladoManualmente, null, null, null, null, null, archivoInsertado.Datos);
+            EstadoMaestroCodigo.AnuladoManualmente, null, null, null, null);
         var transmisionActualizada = await transmisionRepositorio.ActualizarAsync(
             usuarioEjecutor, idInquilino, transmision.Datos, resultadoTransmision, cancellationToken);
         LogSiErrorSistema(transmisionActualizada.IdTipoMensaje, transmisionActualizada.Mensaje, idDocumentoElectronico, "falló al vincular el Pdf anulado a la transmisión manual");
