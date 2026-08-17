@@ -219,6 +219,9 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
+    // Deshabilitado — sin caller (maximlian3_backend usa ListarParaPedidoFactura, no este). Comentado en
+    // vez de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+    /*
     [HttpGet]
     public async Task<IActionResult> Listar(
         [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] string? estadoCodigo, [FromQuery] string? busqueda,
@@ -230,6 +233,7 @@ public sealed class DocumentosElectronicosController(
 
         return ResponderSegunEnvelope(resultado);
     }
+    */
 
     // Exclusivo para el listado que maximlian3_backend expone desde PedidoFactura — no reutiliza Listar
     // (distinto shape/filtros, ver SP_DocumentoElectronico_ListarParaPedidoFactura).
@@ -258,6 +262,9 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
+    // Deshabilitado — sin caller (maximlian3_backend solo usa sire-rvie/txt, no este JSON intermedio).
+    // Comentado en vez de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+    /*
     // SIRE RVIE (Formato 14.4) — documentos de un período ya con todos los campos resueltos para el
     // generador del TXT (ver SP_DocumentoElectronico_ListarParaSireRvie y SIRE_RVIE_Estructura_Campos.md).
     [HttpGet("sire-rvie")]
@@ -268,6 +275,7 @@ public sealed class DocumentosElectronicosController(
         var resultado = await listarParaSireRvieCasoDeUso.EjecutarAsync(idInquilino, idEmpresa, periodo, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
+    */
 
     // Devuelve el TXT ya armado (no el JSON de arriba) — descarga directa, listo para comprimir en ZIP y
     // subir al módulo SIRE. Codificado en ISO-8859-1 (ver GeneradorSireRvieServicio).
@@ -285,6 +293,10 @@ public sealed class DocumentosElectronicosController(
         return File(resultado.Datos.Contenido, "text/plain", resultado.Datos.NombreArchivo);
     }
 
+    // Deshabilitado — sin caller HTTP (EnviarDocumentoElectronicoASunatCasoDeUso ya llama
+    // documentoRepositorio.ActualizarEstadoSunatAsync directo, en el mismo proceso, sin pasar por este
+    // endpoint). Comentado en vez de borrado para retomarlo en un sprint futuro sin tener que reescribirlo.
+    /*
     // Uso exclusivo del Worker (Módulo 4) — no es un Actualizar genérico, solo aplica la respuesta de SUNAT.
     [HttpPut("{idDocumentoElectronico:int}/estado-sunat")]
     public async Task<IActionResult> ActualizarEstadoSunat(
@@ -296,6 +308,7 @@ public sealed class DocumentosElectronicosController(
 
         return ResponderSegunEnvelope(resultado);
     }
+    */
 
     // Para cuando el usuario descubre que SUNAT ya muestra el documento como anulado sin que este sistema
     // haya tramitado esa baja (p.ej. anulado directo en el portal de SUNAT) — registra esa anulación acá,
