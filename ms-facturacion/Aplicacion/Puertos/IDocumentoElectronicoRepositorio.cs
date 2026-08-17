@@ -93,8 +93,11 @@ public interface IDocumentoElectronicoRepositorio
     /// idMotivoMaestro: solo aplica a Nota de Crédito/Débito (null en Factura/Boleta) — a diferencia de
     /// documentoAfectado/idDocumentoElectronicoRelacionado (fijo desde Insertar), el motivo sí es editable
     /// mientras el documento siga PendienteEnvio.
+    /// idExterno: IdExterno solo se llenaba al crear el documento y quedaba obsoleto en cuanto las líneas
+    /// cambiaban (en maximlian3_backend es el join de los IdPedido detrás de cada línea) — el llamador debe
+    /// mandar el valor ya recalculado con las líneas actuales, igual que ya hace al insertar.
     Task<ResultadoOperacion<DocumentoElectronicoCambiosGuardados>> GuardarCambiosAsync(
-        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, int? idFormaPago, string? numeroReferencia,
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string idExterno, int? idFormaPago, string? numeroReferencia,
         int idMonedaMaestro, decimal? tipoCambio, int idTipoOperacionMaestro, int? idMotivoMaestro,
         IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas, IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas,
         IReadOnlyList<CampoExtraEntrada> camposExtra, CancellationToken cancellationToken);
