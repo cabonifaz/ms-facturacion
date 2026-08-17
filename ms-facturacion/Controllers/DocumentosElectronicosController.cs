@@ -64,6 +64,7 @@ public sealed class DocumentosElectronicosController(
     GenerarTxtSireRvieCasoDeUso generarTxtSireRvieCasoDeUso,
     ActualizarEstadoSunatDocumentoElectronicoCasoDeUso actualizarEstadoSunatCasoDeUso,
     AnularManualmenteDocumentoElectronicoCasoDeUso anularManualmenteCasoDeUso,
+    PrevisualizarAnulacionManualCasoDeUso previsualizarAnulacionManualCasoDeUso,
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
@@ -305,6 +306,18 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await anularManualmenteCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.Motivo, peticion.FechaAnulacion, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Previsualiza AnularManualmente sin ejecutar nada — mismas validaciones (documento elegible, sin Nota
+    // de Crédito/Débito sin resolver) y, de poder ejecutarse, la lista de documentos que se verían afectados
+    // (el propio + las Notas vigentes que se arrastrarían).
+    [HttpGet("{idDocumentoElectronico:int}/anular-manualmente/preview")]
+    public async Task<IActionResult> PrevisualizarAnulacionManual(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await previsualizarAnulacionManualCasoDeUso.EjecutarAsync(idInquilino, idDocumentoElectronico, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

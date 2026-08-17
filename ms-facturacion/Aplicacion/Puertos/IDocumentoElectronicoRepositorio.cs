@@ -60,10 +60,19 @@ public interface IDocumentoElectronicoRepositorio
     /// manualmente una anulación ya ocurrida — el SP valida elegibilidad (solo Aceptado/
     /// AceptadoConObservaciones, sin otra anulación en curso o ya registrada) en vez de confiar ciegamente
     /// en el llamador. fechaAnulacion es la fecha real en que ocurrió (normalmente se descubre después),
-    /// la decide el llamador — no "ahora".
-    Task<ResultadoOperacion<EstadoDocumentoElectronicoActualizado>> AnularManualmenteAsync(
+    /// la decide el llamador — no "ahora". Arrastra automáticamente las Notas de Crédito/Débito vigentes de
+    /// idDocumentoElectronico (mismo criterio que SP_LoteDocumento_Insertar para la baja real) — la lista
+    /// devuelta incluye el documento padre y toda Nota arrastrada, no solo el que se pasó.
+    Task<ResultadoOperacion<IReadOnlyList<EstadoDocumentoElectronicoActualizado>>> AnularManualmenteAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, string motivo, DateTime fechaAnulacion,
         CancellationToken cancellationToken);
+
+    /// Solo lectura — corre las mismas validaciones que AnularManualmenteAsync (documento elegible, sin Nota
+    /// de Crédito/Débito vigente con desenlace todavía desconocido) sin escribir nada, para que el llamador
+    /// sepa de antemano si la anulación manual va a poder ejecutarse y qué documentos afectaría (el propio +
+    /// las Notas vigentes que se arrastrarían). Ver SP_DocumentoElectronico_PrevisualizarAnulacionManual.
+    Task<ResultadoOperacion<IReadOnlyList<DocumentoAnulacionManualPreview>>> PrevisualizarAnulacionManualAsync(
+        int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
 
     Task<ResultadoOperacion<bool>> ActualizarFechaEmisionAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
