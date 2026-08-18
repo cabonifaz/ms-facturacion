@@ -34,4 +34,9 @@ public sealed record DocumentoSireRvie(
     DateOnly? FechaEmisionDocModificado,
     string? TipoDocumentoRelacionadoCodigo,
     string? SerieRelacionada,
-    int? CorrelativoRelacionado);
+    int? CorrelativoRelacionado,
+    // Código de afectación IGV 17 (Gravado - IVAP) ya es seleccionable en Insertar/GuardarCambios, pero esas
+    // líneas se bucketean como Gravado normal — no hay forma de reportar por separado los campos 22-23 del
+    // Anexo N.° 1 (Base imponible IVAP/IVAP). El generador debe rechazar el TXT en vez de exportar 0.00 en
+    // esos campos mientras el monto real queda mezclado en TotalGravado/TotalIgv.
+    bool TieneLineaIvap);

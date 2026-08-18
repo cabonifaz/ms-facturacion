@@ -22,6 +22,19 @@ public sealed class GenerarTxtSireRvieCasoDeUso(
                 "No hay documentos Aceptados/AceptadoConObservaciones en ese período para exportar al RVIE.");
         }
 
+        // Código de afectación IGV 17 (Gravado - IVAP) ya es seleccionable al emitir, pero este generador
+        // bucketea esas líneas como Gravado normal y no reporta por separado los campos 22-23 del Anexo N.°
+        // 1 (Base imponible IVAP/IVAP) — mejor rechazar el TXT explícitamente que exportar un archivo
+        // sintácticamente válido pero fiscalmente incorrecto (ver RVIE_Review_Observation_Scope_Validation.md).
+        var idsConIvap = documentos.Datos.Where(d => d.TieneLineaIvap).Select(d => d.IdDocumentoElectronico).ToList();
+        if (idsConIvap.Count > 0)
+        {
+            return ResultadoOperacion<ArchivoTxtSireRvie>.DeReglaDeNegocio(
+                "Uno o más documentos del período contienen líneas afectas a IVAP (código 17), que este " +
+                "exportador RVIE aún no soporta de forma separada. IdDocumentoElectronico: " +
+                string.Join(", ", idsConIvap) + ".");
+        }
+
         var contenido = generador.Construir(documentos.Datos);
 
         // Convención de nombre real de SUNAT para reemplazar la propuesta del RVIE — verificada contra la
@@ -51,7 +64,7 @@ public sealed class GenerarTxtSireRvieCasoDeUso(
         const string identificadorLibro = "140400";
         const string oportunidadPresentacion = "02"; // reemplaza la propuesta
         const string indicadorOperaciones = "1"; // empresa/entidad operativa
-        var indicadorContenido = documentos.Datos.Count > 0 ? "1" : "0";
+        const string indicadorContenido = "1"; // con información — el bloque de arriba ya descarta el caso sin documentos
         const string indicadorMoneda = "1"; // Soles
         const string indicadorGenerador = "2"; // fijo, nuevo sistema SIRE/RVIE
         var nombreArchivo =
