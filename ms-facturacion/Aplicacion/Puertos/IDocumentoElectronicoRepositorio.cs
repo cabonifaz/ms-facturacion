@@ -78,6 +78,11 @@ public interface IDocumentoElectronicoRepositorio
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico,
         DateOnly fechaEmision, TimeOnly horaEmision, CancellationToken cancellationToken);
 
+    /// Elimina (soft-delete) un borrador que nunca se envió a SUNAT (PendienteEnvio) — cualquier tipo de
+    /// documento. Ver SP_DocumentoElectronico_EliminarBorrador.
+    Task<ResultadoOperacion<bool>> EliminarBorradorAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken);
+
     /// Reserva previa al envío, para los 4 tipos de documento: si pasa, marca el documento como Enviando —
     /// evita que un reintento concurrente del mismo documento se envíe dos veces en paralelo. Para Factura/
     /// Boleta es solo eso. Para Nota de Crédito/Débito, además revalida bajo lock que el documento afectado
