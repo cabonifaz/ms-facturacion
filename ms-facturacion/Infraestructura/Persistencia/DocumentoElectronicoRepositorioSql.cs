@@ -603,7 +603,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     LeerNullableDateOnly(lector, "FechaEmisionDocModificado"),
                     LeerNullableString(lector, "TipoDocumentoRelacionadoCodigo"),
                     LeerNullableString(lector, "SerieRelacionada"),
-                    LeerNullableInt(lector, "CorrelativoRelacionado")));
+                    LeerNullableInt(lector, "CorrelativoRelacionado"),
+                    lector.GetBoolean(lector.GetOrdinal("TieneLineaIvap"))));
             }
 
             return ResultadoOperacion<IReadOnlyList<DocumentoSireRvie>>.DeExito(mensaje, documentos);
