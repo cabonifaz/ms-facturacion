@@ -68,6 +68,7 @@ public sealed class DocumentosElectronicosController(
     EnviarDocumentoElectronicoASunatCasoDeUso enviarASunatCasoDeUso,
     GuardarCambiosDocumentoElectronicoCasoDeUso guardarCambiosCasoDeUso,
     ActualizarEstadoCuotaDocumentoElectronicoCasoDeUso actualizarEstadoCuotaCasoDeUso,
+    EliminarBorradorDocumentoElectronicoCasoDeUso eliminarBorradorCasoDeUso,
     ListarEventosRecientesCasoDeUso listarEventosRecientesCasoDeUso,
     ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
@@ -319,6 +320,18 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await anularManualmenteCasoDeUso.EjecutarAsync(
             UsuarioEjecutor, idInquilino, idDocumentoElectronico, peticion.Motivo, peticion.FechaAnulacion, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Elimina (soft-delete) un borrador que nunca se envió a SUNAT (PendienteEnvio) — Factura, Boleta, Nota
+    // de Crédito o Nota de Débito. Ver SP_DocumentoElectronico_EliminarBorrador.
+    [HttpDelete("{idDocumentoElectronico:int}")]
+    public async Task<IActionResult> EliminarBorrador(
+        [FromQuery] int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        var resultado = await eliminarBorradorCasoDeUso.EjecutarAsync(
+            UsuarioEjecutor, idInquilino, idDocumentoElectronico, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

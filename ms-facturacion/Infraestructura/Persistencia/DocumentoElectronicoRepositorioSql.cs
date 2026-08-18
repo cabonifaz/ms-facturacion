@@ -769,6 +769,32 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<bool>> EliminarBorradorAsync(
+        string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_EliminarBorrador", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            return idTipoMensaje == TipoMensaje.Exito
+                ? ResultadoOperacion<bool>.DeExito(mensaje, true)
+                : new ResultadoOperacion<bool>(idTipoMensaje, mensaje, default);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<bool>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<bool>> ValidarSaldoNotaCreditoAsync(
         string usuarioEjecutor, int idInquilino, int idDocumentoElectronico, CancellationToken cancellationToken)
     {
