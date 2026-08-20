@@ -11,12 +11,14 @@ namespace ms_facturacion.Infraestructura.Xml;
 ///
 /// Verificado contra UBLPE-SunatAggregateComponents-1.0.xsd / UBL-CommonAggregateComponents-2.0.xsd
 /// (github.com/giansalex/sunat-sfs) tras el primer rechazo real de SUNAT (cvc-particle 2.1 en
-/// SummaryDocumentsLine). Los dos puntos que quedaban pendientes de la primera versión (basada solo en
-/// fe-primer.greenter.dev, fuente secundaria) ya están resueltos: SummaryDocumentsLineType no tiene
-/// VoidReasonDescription (ese elemento es de VoidedDocumentsLineType, no de este tipo) y sí exige
-/// TotalAmount. De paso salieron dos errores más que la fuente secundaria no reflejaba: el wrapper de status
-/// es cac:Status (no sac:Status), y su hijo es cbc:ConditionCode (no cbc:StatusCode) — StatusType no
-/// declara ningún StatusCode.
+/// SummaryDocumentsLine), y contra el XML de ejemplo real de la Guía SUNAT (GUIA_Resumen_de_Boletas,
+/// cpe.sunat.gob.pe) tras el segundo rechazo (error 2072, CustomizationID) — ambas fuentes primarias, no
+/// fe-primer.greenter.dev (secundaria, usada en la versión original). Los dos puntos pendientes de esa
+/// primera versión ya están resueltos: SummaryDocumentsLineType no tiene VoidReasonDescription (es de
+/// VoidedDocumentsLineType) y sí exige TotalAmount. Salieron tres errores más que la fuente secundaria no
+/// reflejaba: el wrapper de status es cac:Status (no sac:Status) con hijo cbc:ConditionCode (no
+/// cbc:StatusCode, que StatusType ni declara); y CustomizationID es "1.1" (no "1.0", el valor de
+/// VoidedDocuments/Comunicación de Baja — Resumen usa una versión de estructura distinta).
 public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlResumenBajaBoletaServicio
 {
     private static readonly XNamespace Summary = "urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1";
@@ -42,7 +44,7 @@ public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlRes
                     new XElement(Ext + "ExtensionContent"))),
 
             new XElement(Cbc + "UBLVersionID", "2.0"),
-            new XElement(Cbc + "CustomizationID", "1.0"),
+            new XElement(Cbc + "CustomizationID", "1.1"), // confirmado contra el ejemplo XML real de la Guía SUNAT (ver comentario de clase) — "1.0" (error SUNAT 2072) fue un supuesto sin verificar de la primera versión
             new XElement(Cbc + "ID", cabecera.Nombre), // "RC-<fecha>-<correlativo>"
             new XElement(Cbc + "ReferenceDate", cabecera.FechaReferencia.ToString("yyyy-MM-dd")),
             new XElement(Cbc + "IssueDate", DateOnly.FromDateTime(cabecera.FechaGeneracion).ToString("yyyy-MM-dd")),
