@@ -20,5 +20,9 @@ public enum EstadoMaestroCodigo
     TicketConError = 12,
     ComunicacionBajaRechazada = 13,
     ComunicacionBajaConError = 14,
-    AnuladoManualmente = 15
+    AnuladoManualmente = 15,
+    ResumenBajaEnviado = 16,
+    ResumenBajaAceptado = 17,
+    ResumenBajaRechazado = 18,
+    ResumenBajaConError = 19
 }
