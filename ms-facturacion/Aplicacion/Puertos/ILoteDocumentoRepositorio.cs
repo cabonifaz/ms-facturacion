@@ -20,6 +20,20 @@ public interface ILoteDocumentoRepositorio
         int idInquilino, int idEmpresa, DateOnly fechaGeneracion,
         IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken);
 
+    /// Resumen Diario de Baja (TipoLoteCodigo='ResumenBajaBoleta', prefijo "RC-") para Boleta y sus Notas de
+    /// Crédito/Débito vinculadas — mecanismo SUNAT distinto de InsertarAsync (Comunicación de Baja/"RA-"),
+    /// que ya no acepta Boleta. Mismo shape de parámetros/retorno que InsertarAsync. Ver
+    /// SP_LoteResumenBajaBoleta_Insertar.
+    Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarResumenBajaBoletaAsync(
+        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
+        IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken);
+
+    /// Solo lectura — mismo criterio que PrevisualizarBajaAsync, para el Resumen Diario de Baja de Boletas.
+    /// Ver SP_LoteResumenBajaBoleta_PrevisualizarBaja.
+    Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarResumenBajaBoletaAsync(
+        int idInquilino, int idEmpresa, DateOnly fechaGeneracion,
+        IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken);
+
     /// Lote (TipoLoteCodigo='AnulacionManual') para el documento anulado manualmente + toda Nota de
     /// Crédito/Débito vigente arrastrada con él (ver IDocumentoElectronicoRepositorio.AnularManualmenteAsync),
     /// creado por AnularManualmenteDocumentoElectronicoCasoDeUso — nunca se transmite a SUNAT, solo sirve de

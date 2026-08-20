@@ -66,6 +66,7 @@ builder.Services.AddScoped<IConstructorXmlComprobanteServicio, ConstructorXmlCom
 builder.Services.AddScoped<IGeneradorPdfComprobanteServicio, GeneradorPdfComprobanteServicio>();
 builder.Services.AddScoped<IGeneradorSireRvieServicio, GeneradorSireRvieServicio>();
 builder.Services.AddScoped<IConstructorXmlBajaServicio, ConstructorXmlBajaServicio>();
+builder.Services.AddScoped<IConstructorXmlResumenBajaBoletaServicio, ConstructorXmlResumenBajaBoletaServicio>();
 builder.Services.AddScoped<IFirmadorXmlServicio, FirmadorXmlServicio>();
 builder.Services.AddScoped<IProveedorCertificadoServicio, ProveedorCertificadoServicio>();
 builder.Services.AddScoped<IEmpaquetadorZipServicio, EmpaquetadorZipServicio>();
@@ -149,6 +150,9 @@ builder.Services.AddScoped<EliminarConfiguracionFacturacionEmpresaCasoDeUso>();
 builder.Services.AddScoped<EnviarComunicacionBajaASunatCasoDeUso>();
 builder.Services.AddScoped<PrevisualizarBajaCasoDeUso>();
 builder.Services.AddScoped<ConsultarTicketComunicacionBajaCasoDeUso>();
+builder.Services.AddScoped<EnviarResumenBajaBoletaASunatCasoDeUso>();
+builder.Services.AddScoped<PrevisualizarResumenBajaBoletaCasoDeUso>();
+builder.Services.AddScoped<ConsultarTicketResumenBajaCasoDeUso>();
 builder.Services.AddScoped<ResolverTicketsPendientesCasoDeUso>();
 
 // Workers — resuelve tickets de Comunicación de Baja pendientes (ver SP_LoteDocumento_ListarPendientesTicket)
