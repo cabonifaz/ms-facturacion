@@ -331,7 +331,9 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
                     lector.GetString(lector.GetOrdinal("EstadoItemCodigo")),
                     lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
                     lector.GetString(lector.GetOrdinal("Serie")),
-                    lector.GetInt32(lector.GetOrdinal("Correlativo"))));
+                    lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetString(lector.GetOrdinal("MonedaCodigo"))));
             }
 
             var detalle = new LoteDocumentoDetalle(cabecera, items);

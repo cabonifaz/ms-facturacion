@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml.Linq;
 using ms_facturacion.Aplicacion.Puertos;
 using ms_facturacion.Dominio;
@@ -8,16 +9,14 @@ namespace ms_facturacion.Infraestructura.Xml;
 /// Boletas — raíz/namespace distintos de VoidedDocuments (ConstructorXmlBajaServicio), aunque comparte el
 /// mismo patrón ext:UBLExtensions/cac:Signature/cac:AccountingSupplierParty ya resuelto ahí.
 ///
-/// NO verificado todavía contra la guía SUNAT primaria (Guía XML Resumen de Boletas — la conexión directa a
-/// contenido.app.sunat.gob.pe falló durante la investigación de este pase; se basó en fe-primer.greenter.dev,
-/// que documenta el mismo estándar de forma secundaria). Dos puntos pendientes de confirmar antes de usar
-/// esto contra SUNAT real:
-///   1. sac:VoidReasonDescription para el motivo de la línea — se asume el mismo nombre de elemento que ya
-///      usa VoidedDocumentsLine; no confirmado que SummaryDocumentsLine use el mismo nombre.
-///   2. Si SUNAT exige totales (TotalAmount/TaxTotal) también en una línea anulada — ItemLoteDocumentoDetalle
-///      no trae esos datos hoy (SP_LoteDocumento_Obtener nunca los seleccionó, ni falta para VoidedDocuments);
-///      si el punto 2 resulta cierto, este constructor y esa consulta necesitan extenderse antes de poder
-///      enviar un resumen real.
+/// Verificado contra UBLPE-SunatAggregateComponents-1.0.xsd / UBL-CommonAggregateComponents-2.0.xsd
+/// (github.com/giansalex/sunat-sfs) tras el primer rechazo real de SUNAT (cvc-particle 2.1 en
+/// SummaryDocumentsLine). Los dos puntos que quedaban pendientes de la primera versión (basada solo en
+/// fe-primer.greenter.dev, fuente secundaria) ya están resueltos: SummaryDocumentsLineType no tiene
+/// VoidReasonDescription (ese elemento es de VoidedDocumentsLineType, no de este tipo) y sí exige
+/// TotalAmount. De paso salieron dos errores más que la fuente secundaria no reflejaba: el wrapper de status
+/// es cac:Status (no sac:Status), y su hijo es cbc:ConditionCode (no cbc:StatusCode) — StatusType no
+/// declara ningún StatusCode.
 public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlResumenBajaBoletaServicio
 {
     private static readonly XNamespace Summary = "urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1";
@@ -82,15 +81,20 @@ public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlRes
                 new XElement(Cac + "PartyLegalEntity",
                     new XElement(Cbc + "RegistrationName", empresa.RazonSocial))));
 
-    /// Status=3 fijo — este constructor solo se usa para el camino "solo anulación" (nunca declara altas/
+    /// Status=3 fijo (cac:Status/cbc:ConditionCode, no sac:Status/cbc:StatusCode — StatusType no declara
+    /// StatusCode) — este constructor solo se usa para el camino "solo anulación" (nunca declara altas/
     /// modificaciones, status 1/2). ID = Serie-Correlativo combinado, no Serial/Number separados como en
-    /// VoidedDocumentsLine.
+    /// VoidedDocumentsLine. Sin VoidReasonDescription: SummaryDocumentsLineType no lo declara (es de
+    /// VoidedDocumentsLineType); MotivoDescripcion sigue quedando en BD, solo no va en este XML.
+    /// sac:TotalAmount es obligatorio en la secuencia (a diferencia de VoidedDocumentsLine, que no lo pide).
     private XElement ConstruirLinea(ItemLoteDocumentoDetalle item) =>
         new(Sac + "SummaryDocumentsLine",
             new XElement(Cbc + "LineID", item.NumeroLinea),
             new XElement(Cbc + "DocumentTypeCode", item.TipoDocumentoCodigo),
             new XElement(Cbc + "ID", $"{item.Serie}-{item.Correlativo}"),
-            new XElement(Sac + "Status",
-                new XElement(Cbc + "StatusCode", "3")),
-            new XElement(Sac + "VoidReasonDescription", item.MotivoDescripcion));
+            new XElement(Cac + "Status",
+                new XElement(Cbc + "ConditionCode", "3")),
+            new XElement(Sac + "TotalAmount",
+                new XAttribute("currencyID", item.MonedaCodigo),
+                item.TotalImporte.ToString("F2", CultureInfo.InvariantCulture)));
 }
