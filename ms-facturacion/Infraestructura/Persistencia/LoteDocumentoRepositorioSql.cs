@@ -333,6 +333,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
                     lector.GetString(lector.GetOrdinal("Serie")),
                     lector.GetInt32(lector.GetOrdinal("Correlativo")),
                     lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
                     lector.GetString(lector.GetOrdinal("MonedaCodigo"))));
             }
 

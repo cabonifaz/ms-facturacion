@@ -8,7 +8,7 @@ public sealed record LoteDocumento(
 public sealed record ItemLoteDocumentoDetalle(
     int IdItemLoteDocumento, int IdDocumentoElectronico, int NumeroLinea, string MotivoDescripcion,
     string EstadoItemCodigo, string TipoDocumentoCodigo, string Serie, int Correlativo,
-    decimal TotalImporte, string MonedaCodigo);
+    decimal TotalImporte, decimal TotalIgv, string MonedaCodigo);
 
 public sealed record LoteDocumentoDetalle(LoteDocumento Cabecera, IReadOnlyList<ItemLoteDocumentoDetalle> Items);
 

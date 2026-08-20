@@ -12,13 +12,13 @@ namespace ms_facturacion.Infraestructura.Xml;
 /// Verificado contra UBLPE-SunatAggregateComponents-1.0.xsd / UBL-CommonAggregateComponents-2.0.xsd
 /// (github.com/giansalex/sunat-sfs) tras el primer rechazo real de SUNAT (cvc-particle 2.1 en
 /// SummaryDocumentsLine), y contra el XML de ejemplo real de la Guía SUNAT (GUIA_Resumen_de_Boletas,
-/// cpe.sunat.gob.pe) tras el segundo rechazo (error 2072, CustomizationID) — ambas fuentes primarias, no
-/// fe-primer.greenter.dev (secundaria, usada en la versión original). Los dos puntos pendientes de esa
-/// primera versión ya están resueltos: SummaryDocumentsLineType no tiene VoidReasonDescription (es de
-/// VoidedDocumentsLineType) y sí exige TotalAmount. Salieron tres errores más que la fuente secundaria no
-/// reflejaba: el wrapper de status es cac:Status (no sac:Status) con hijo cbc:ConditionCode (no
-/// cbc:StatusCode, que StatusType ni declara); y CustomizationID es "1.1" (no "1.0", el valor de
-/// VoidedDocuments/Comunicación de Baja — Resumen usa una versión de estructura distinta).
+/// cpe.sunat.gob.pe) tras el segundo (error 2072, CustomizationID) y tercer rechazo (error 2278, falta
+/// IGV) — fuentes primarias, no fe-primer.greenter.dev (secundaria, usada en la versión original). Frente
+/// a esa primera versión: SummaryDocumentsLineType no tiene VoidReasonDescription (es de
+/// VoidedDocumentsLineType); el wrapper de status es cac:Status (no sac:Status) con hijo
+/// cbc:ConditionCode (no cbc:StatusCode, que StatusType ni declara); CustomizationID es "1.1" (no "1.0",
+/// el valor de VoidedDocuments/Comunicación de Baja); y hacen falta tanto sac:TotalAmount como
+/// cac:TaxTotal (IGV) por línea, ninguno de los dos exigido en VoidedDocumentsLine.
 public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlResumenBajaBoletaServicio
 {
     private static readonly XNamespace Summary = "urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1";
@@ -88,9 +88,15 @@ public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlRes
     /// modificaciones, status 1/2). ID = Serie-Correlativo combinado, no Serial/Number separados como en
     /// VoidedDocumentsLine. Sin VoidReasonDescription: SummaryDocumentsLineType no lo declara (es de
     /// VoidedDocumentsLineType); MotivoDescripcion sigue quedando en BD, solo no va en este XML.
-    /// sac:TotalAmount es obligatorio en la secuencia (a diferencia de VoidedDocumentsLine, que no lo pide).
-    private XElement ConstruirLinea(ItemLoteDocumentoDetalle item) =>
-        new(Sac + "SummaryDocumentsLine",
+    /// sac:TotalAmount y cac:TaxTotal (IGV) son obligatorios en la secuencia (a diferencia de
+    /// VoidedDocumentsLine, que no los pide) — confirmado por SUNAT (error 2278, "Debe indicar
+    /// información acerca del importe total de IGV/IVAP") tras agregar sac:TotalAmount solo. Código de
+    /// tributo 1000/IGV/VAT (Catálogo N.° 05) igual que el ejemplo real de la Guía SUNAT.
+    private XElement ConstruirLinea(ItemLoteDocumentoDetalle item)
+    {
+        var montoIgv = item.TotalIgv.ToString("F2", CultureInfo.InvariantCulture);
+
+        return new XElement(Sac + "SummaryDocumentsLine",
             new XElement(Cbc + "LineID", item.NumeroLinea),
             new XElement(Cbc + "DocumentTypeCode", item.TipoDocumentoCodigo),
             new XElement(Cbc + "ID", $"{item.Serie}-{item.Correlativo}"),
@@ -98,5 +104,15 @@ public sealed class ConstructorXmlResumenBajaBoletaServicio : IConstructorXmlRes
                 new XElement(Cbc + "ConditionCode", "3")),
             new XElement(Sac + "TotalAmount",
                 new XAttribute("currencyID", item.MonedaCodigo),
-                item.TotalImporte.ToString("F2", CultureInfo.InvariantCulture)));
+                item.TotalImporte.ToString("F2", CultureInfo.InvariantCulture)),
+            new XElement(Cac + "TaxTotal",
+                new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", item.MonedaCodigo), montoIgv),
+                new XElement(Cac + "TaxSubtotal",
+                    new XElement(Cbc + "TaxAmount", new XAttribute("currencyID", item.MonedaCodigo), montoIgv),
+                    new XElement(Cac + "TaxCategory",
+                        new XElement(Cac + "TaxScheme",
+                            new XElement(Cbc + "ID", "1000"),
+                            new XElement(Cbc + "Name", "IGV"),
+                            new XElement(Cbc + "TaxTypeCode", "VAT"))))));
+    }
 }
