@@ -4,11 +4,14 @@ using ms_facturacion.Dominio;
 
 namespace ms_facturacion.Aplicacion.CasosDeUso.LotesDocumento;
 
-// Excepción deliberada a "depende solo de Puertos": delega en ConsultarTicketComunicacionBajaCasoDeUso
-// en vez de duplicar su lógica de consulta a SUNAT.
+// Excepción deliberada a "depende solo de Puertos": delega en ConsultarTicketComunicacionBajaCasoDeUso/
+// ConsultarTicketResumenBajaCasoDeUso en vez de duplicar su lógica de consulta a SUNAT — SP_LoteDocumento_
+// ListarPendientesTicket devuelve lotes de ambos tipos mezclados (ninguno filtra por TipoLoteCodigo), así
+// que el despacho por tipo pasa acá.
 public sealed class ResolverTicketsPendientesCasoDeUso(
     ILoteDocumentoRepositorio loteRepositorio,
-    ConsultarTicketComunicacionBajaCasoDeUso consultarTicketCasoDeUso,
+    ConsultarTicketComunicacionBajaCasoDeUso consultarTicketComunicacionBajaCasoDeUso,
+    ConsultarTicketResumenBajaCasoDeUso consultarTicketResumenBajaCasoDeUso,
     ILogger<ResolverTicketsPendientesCasoDeUso> logger)
 {
     public async Task<ResultadoOperacion<IReadOnlyList<ResultadoResolucionTicket>>> EjecutarAsync(
@@ -50,8 +53,9 @@ public sealed class ResolverTicketsPendientesCasoDeUso(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var resultado = await consultarTicketCasoDeUso.EjecutarAsync(
-                lote.IdInquilino, lote.IdLoteDocumento, ambienteCodigo, cancellationToken);
+            var resultado = lote.TipoLoteCodigo == "ResumenBajaBoleta"
+                ? await consultarTicketResumenBajaCasoDeUso.EjecutarAsync(lote.IdInquilino, lote.IdLoteDocumento, ambienteCodigo, cancellationToken)
+                : await consultarTicketComunicacionBajaCasoDeUso.EjecutarAsync(lote.IdInquilino, lote.IdLoteDocumento, ambienteCodigo, cancellationToken);
 
             resultados.Add(new ResultadoResolucionTicket(
                 lote.IdInquilino, lote.IdLoteDocumento, resultado.IdTipoMensaje == TipoMensaje.Exito, resultado.Mensaje));

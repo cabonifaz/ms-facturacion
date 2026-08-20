@@ -123,6 +123,114 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         }
     }
 
+    public async Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarResumenBajaBoletaAsync(
+        string usuarioEjecutor, int idInquilino, int idEmpresa, DateOnly fechaReferencia, DateOnly fechaGeneracion,
+        IReadOnlyList<ItemBajaEntrada> items, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LoteResumenBajaBoleta_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+
+            var tabla = new DataTable();
+            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
+            tabla.Columns.Add("MotivoDescripcion", typeof(string));
+            foreach (var item in items)
+            {
+                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
+            }
+
+            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
+            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
+            tvpItems.Value = tabla;
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<LoteDocumentoCreado>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var creado = new LoteDocumentoCreado(
+                lector.GetInt32(lector.GetOrdinal("IdLoteDocumento")),
+                lector.GetString(lector.GetOrdinal("Nombre")),
+                lector.GetString(lector.GetOrdinal("EstadoCodigo")),
+                lector.GetDateTime(lector.GetOrdinal("FechaGeneracion")));
+
+            return ResultadoOperacion<LoteDocumentoCreado>.DeExito(mensaje, creado);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<LoteDocumentoCreado>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>> PrevisualizarResumenBajaBoletaAsync(
+        int idInquilino, int idEmpresa, DateOnly fechaGeneracion,
+        IReadOnlyList<int> idsDocumentoElectronico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_LoteResumenBajaBoleta_PrevisualizarBaja", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+
+            var tabla = new DataTable();
+            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
+            tabla.Columns.Add("MotivoDescripcion", typeof(string));
+            foreach (var id in idsDocumentoElectronico)
+            {
+                tabla.Rows.Add(id, string.Empty);
+            }
+
+            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
+            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
+            tvpItems.Value = tabla;
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+
+            var afectados = new List<DocumentoBajaPreview>();
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                afectados.Add(new DocumentoBajaPreview(
+                    lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                    lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
+                    lector.GetString(lector.GetOrdinal("NumeroDocumento")),
+                    DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaEmision"))),
+                    lector.GetString(lector.GetOrdinal("EstadoCodigo"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>.DeExito(mensaje, afectados);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DocumentoBajaPreview>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<LoteDocumentoCreado>> InsertarManualAsync(
         string usuarioEjecutor, int idInquilino, int idEmpresa, IReadOnlyList<ItemBajaEntrada> items,
         DateOnly fechaReferencia, DateTime fechaGeneracion, CancellationToken cancellationToken)
@@ -223,7 +331,10 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
                     lector.GetString(lector.GetOrdinal("EstadoItemCodigo")),
                     lector.GetString(lector.GetOrdinal("TipoDocumentoCodigo")),
                     lector.GetString(lector.GetOrdinal("Serie")),
-                    lector.GetInt32(lector.GetOrdinal("Correlativo"))));
+                    lector.GetInt32(lector.GetOrdinal("Correlativo")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalImporte")),
+                    lector.GetDecimal(lector.GetOrdinal("TotalIgv")),
+                    lector.GetString(lector.GetOrdinal("MonedaCodigo"))));
             }
 
             var detalle = new LoteDocumentoDetalle(cabecera, items);
@@ -296,6 +407,7 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
                 lotes.Add(new LotePendienteTicket(
                     lector.GetInt32(lector.GetOrdinal("IdInquilino")),
                     lector.GetInt32(lector.GetOrdinal("IdLoteDocumento")),
+                    lector.GetString(lector.GetOrdinal("TipoLoteCodigo")),
                     LeerNullableString(lector, "Ticket")));
             }
 
