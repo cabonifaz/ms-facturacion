@@ -166,7 +166,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                     lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
                     LeerNullableInt(lector, "IdPedido"),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableString(lector, "ProductoCodigo"),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
                     lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -298,7 +298,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 productos.Add(new ProductoDocumentoResumen(
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
+                    LeerNullableString(lector, "ProductoCodigo")));
             }
 
             return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, idMonedaMaestro, tipoCambio, productos));
@@ -380,7 +380,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 lineas.Add(new LineaDocumentoElectronicoPublica(
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableString(lector, "ProductoCodigo"),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
                     lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -1021,7 +1021,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         foreach (var linea in lineas)
         {
             tabla.Rows.Add(
-                linea.IdLineaDocumentoElectronico, linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
+                linea.IdLineaDocumentoElectronico, linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
@@ -1057,7 +1057,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
         null,
-        lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+        LeerNullableString(lector, "ProductoCodigo"),
         LeerNullableString(lector, "ProductoSunatCodigo"),
         lector.GetString(lector.GetOrdinal("Descripcion")),
         lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -1104,7 +1104,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         foreach (var linea in lineas)
         {
             tabla.Rows.Add(
-                linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
+                linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
@@ -1167,6 +1167,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
     }
+
+    /// Para columnas opcionales tipo string (p.ej. ProductoCodigo): "" se guarda como NULL, no como cadena
+    /// vacía — evita dos representaciones distintas de "sin dato" en la misma columna.
+    private static object EscribirNullableString(string? valor) =>
+        string.IsNullOrWhiteSpace(valor) ? DBNull.Value : valor;
 
     private static decimal? LeerNullableDecimal(SqlDataReader lector, string columna)
     {

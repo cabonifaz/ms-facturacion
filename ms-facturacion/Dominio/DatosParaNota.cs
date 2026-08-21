@@ -9,4 +9,4 @@ namespace ms_facturacion.Dominio;
 /// para prellenarla. TipoCambio es NULL cuando la moneda es PEN, mismo criterio que DOCUMENTOS_ELECTRONICOS.
 public sealed record DatosParaNota(ClienteDatosEntrada Cliente, int IdMonedaMaestro, decimal? TipoCambio, IReadOnlyList<ProductoDocumentoResumen> Productos);
 
-public sealed record ProductoDocumentoResumen(int NumeroLinea, string ProductoCodigo);
+public sealed record ProductoDocumentoResumen(int NumeroLinea, string? ProductoCodigo);

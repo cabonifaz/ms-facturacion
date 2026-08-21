@@ -12,7 +12,7 @@ public sealed record ClientePeticion(
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
 
 public sealed record ItemPeticion(
-    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    int NumeroLinea, string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
@@ -33,7 +33,7 @@ public sealed record AnularManualmentePeticion(string Motivo, DateTime FechaAnul
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
-    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
