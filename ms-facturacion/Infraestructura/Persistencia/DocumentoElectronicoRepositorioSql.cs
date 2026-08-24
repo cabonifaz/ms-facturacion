@@ -165,7 +165,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 lineas.Add(new LineaDocumentoElectronico(
                     lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    LeerNullableInt(lector, "IdPedido"),
+                    LeerNullableInt(lector, "IdPedidoFacturaLinea"),
                     LeerNullableString(lector, "ProductoCodigo"),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
@@ -1050,7 +1050,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         return tabla;
     }
 
-    // IdPedido: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
+    // IdPedidoFacturaLinea: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
     // SP_DocumentoElectronico_Obtener) — el llamador ya lo mandó en la misma request que generó estas
     // líneas, no hace falta que el SP se lo confirme de vuelta.
     private static LineaDocumentoElectronico LeerLinea(SqlDataReader lector) => new(
