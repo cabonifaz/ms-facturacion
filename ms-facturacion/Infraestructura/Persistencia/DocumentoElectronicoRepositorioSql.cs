@@ -165,8 +165,8 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
                 lineas.Add(new LineaDocumentoElectronico(
                     lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    LeerNullableInt(lector, "IdPedido"),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableInt(lector, "IdPedidoFacturaLinea"),
+                    LeerNullableString(lector, "ProductoCodigo"),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
                     lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -298,7 +298,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 productos.Add(new ProductoDocumentoResumen(
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo"))));
+                    LeerNullableString(lector, "ProductoCodigo")));
             }
 
             return ResultadoOperacion<DatosParaNota>.DeExito(mensaje, new DatosParaNota(cliente, idMonedaMaestro, tipoCambio, productos));
@@ -380,7 +380,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
             {
                 lineas.Add(new LineaDocumentoElectronicoPublica(
                     lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
-                    lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+                    LeerNullableString(lector, "ProductoCodigo"),
                     LeerNullableString(lector, "ProductoSunatCodigo"),
                     lector.GetString(lector.GetOrdinal("Descripcion")),
                     lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -433,6 +433,40 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         catch (Exception ex)
         {
             return ResultadoOperacion<DocumentoElectronicoDetallePublico>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IdentificadorDocumentoPorToken>> ObtenerIdPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerIdPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IdentificadorDocumentoPorToken>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var identificador = new IdentificadorDocumentoPorToken(
+                lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                lector.GetInt32(lector.GetOrdinal("IdInquilino")));
+
+            return ResultadoOperacion<IdentificadorDocumentoPorToken>.DeExito(mensaje, identificador);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IdentificadorDocumentoPorToken>.DeErrorSistema(ex.Message);
         }
     }
 
@@ -1021,7 +1055,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         foreach (var linea in lineas)
         {
             tabla.Rows.Add(
-                linea.IdLineaDocumentoElectronico, linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
+                linea.IdLineaDocumentoElectronico, linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
@@ -1050,14 +1084,14 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         return tabla;
     }
 
-    // IdPedido: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
+    // IdPedidoFacturaLinea: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
     // SP_DocumentoElectronico_Obtener) — el llamador ya lo mandó en la misma request que generó estas
     // líneas, no hace falta que el SP se lo confirme de vuelta.
     private static LineaDocumentoElectronico LeerLinea(SqlDataReader lector) => new(
         lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
         null,
-        lector.GetString(lector.GetOrdinal("ProductoCodigo")),
+        LeerNullableString(lector, "ProductoCodigo"),
         LeerNullableString(lector, "ProductoSunatCodigo"),
         lector.GetString(lector.GetOrdinal("Descripcion")),
         lector.GetString(lector.GetOrdinal("UnidadMedidaCodigo")),
@@ -1104,7 +1138,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         foreach (var linea in lineas)
         {
             tabla.Rows.Add(
-                linea.NumeroLinea, linea.ProductoCodigo, (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
+                linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
                 linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
                 linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
         }
@@ -1167,6 +1201,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
     }
+
+    /// Para columnas opcionales tipo string (p.ej. ProductoCodigo): "" se guarda como NULL, no como cadena
+    /// vacía — evita dos representaciones distintas de "sin dato" en la misma columna.
+    private static object EscribirNullableString(string? valor) =>
+        string.IsNullOrWhiteSpace(valor) ? DBNull.Value : valor;
 
     private static decimal? LeerNullableDecimal(SqlDataReader lector, string columna)
     {

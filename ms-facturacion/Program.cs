@@ -99,6 +99,7 @@ builder.Services.AddScoped<EliminarSerieDocumentoCasoDeUso>();
 builder.Services.AddScoped<InsertarDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoCasoDeUso>();
 builder.Services.AddScoped<ObtenerDocumentoElectronicoPorTokenCasoDeUso>();
+builder.Services.AddScoped<ObtenerIdDocumentoElectronicoPorTokenCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosElectronicosParaPedidoFacturaCasoDeUso>();
 builder.Services.AddScoped<ListarDocumentosParaSireRvieCasoDeUso>();

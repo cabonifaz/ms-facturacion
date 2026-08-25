@@ -28,6 +28,13 @@ public interface IDocumentoElectronicoRepositorio
     Task<ResultadoOperacion<DocumentoElectronicoDetallePublico>> ObtenerPorTokenAsync(
         string tokenPublico, CancellationToken cancellationToken);
 
+    /// Variante mínima de ObtenerPorTokenAsync: solo resuelve el token a IdDocumentoElectronico/
+    /// IdInquilino, sin traer cabecera/líneas/etc. — para que maximlian3_backend arme su propia
+    /// consulta (pedidos del documento) contra su base con esos dos ids. Ver
+    /// SP_DocumentoElectronico_ObtenerIdPorToken.
+    Task<ResultadoOperacion<IdentificadorDocumentoPorToken>> ObtenerIdPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken);
+
     /// Cliente + líneas de un documento ya emitido, sin resolver los Num1 contra TABLA_MAESTRA — para
     /// prellenar/listar ambos al armar una Nota de Crédito/Débito contra ese documento.
     Task<ResultadoOperacion<DatosParaNota>> ObtenerParaNotaAsync(

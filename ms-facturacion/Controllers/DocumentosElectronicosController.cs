@@ -12,7 +12,7 @@ public sealed record ClientePeticion(
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
 
 public sealed record ItemPeticion(
-    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    int NumeroLinea, string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
@@ -33,7 +33,7 @@ public sealed record AnularManualmentePeticion(string Motivo, DateTime FechaAnul
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
-    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
@@ -73,6 +73,7 @@ public sealed class DocumentosElectronicosController(
     ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
+    ObtenerIdDocumentoElectronicoPorTokenCasoDeUso obtenerIdPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
@@ -188,6 +189,16 @@ public sealed class DocumentosElectronicosController(
     public async Task<IActionResult> ObtenerPorToken(string token, CancellationToken cancellationToken)
     {
         var resultado = await obtenerPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Variante mínima de ObtenerPorToken: solo el Id/IdInquilino, para que maximlian3_backend arme
+    // su propia consulta (pedidos del documento) contra su base. Mismo criterio de exposición
+    // pública que ObtenerPorToken.
+    [HttpGet("token/{token}/id")]
+    public async Task<IActionResult> ObtenerIdPorToken(string token, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerIdPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

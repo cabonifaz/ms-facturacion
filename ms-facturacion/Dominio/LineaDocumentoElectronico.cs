@@ -4,11 +4,11 @@ namespace ms_facturacion.Dominio;
 /// TributoSunatCodigo/TributoNombre/TributoTaxTypeCode/TributoCategoria (Catálogo N.° 05 SUNAT) se
 /// resuelven en el SP a partir de AfectacionIgvCodigo (Catálogo N.° 07) — ver
 /// facturacion/catalogos_sunat_referencia.md.
-/// IdPedido: solo en Factura/Boleta (desarmado de DOCUMENTOS_ELECTRONICOS.IdExterno por posición contra
-/// NumeroLinea — ver SP_DocumentoElectronico_Obtener) — null en Nota de Crédito/Débito, cuyo IdExterno es
-/// el id del documento afectado, no una lista de pedidos.
+/// IdPedidoFacturaLinea (maximlian3): solo en Factura/Boleta (desarmado de DOCUMENTOS_ELECTRONICOS.
+/// IdExterno por posición contra NumeroLinea — ver SP_DocumentoElectronico_Obtener) — null en Nota de
+/// Crédito/Débito, cuyo IdExterno es el id del documento afectado, no una lista de líneas.
 public sealed record LineaDocumentoElectronico(
-    int IdLineaDocumentoElectronico, int NumeroLinea, int? IdPedido, string ProductoCodigo, string? ProductoSunatCodigo,
+    int IdLineaDocumentoElectronico, int NumeroLinea, int? IdPedidoFacturaLinea, string? ProductoCodigo, string? ProductoSunatCodigo,
     string Descripcion, string UnidadMedidaCodigo, decimal Cantidad, decimal ValorUnitario, decimal PrecioUnitario,
     decimal MontoDescuento, string AfectacionIgvCodigo,
     string TributoSunatCodigo, string TributoNombre, string TributoTaxTypeCode, string TributoCategoria,
@@ -20,6 +20,6 @@ public sealed record LineaDocumentoElectronico(
 /// nueva, >0 = línea existente a actualizar. IdUnidadMedidaMaestro es Num1 de TABLA_MAESTRA IdMaestro=13
 /// (subconjunto cerrado del Catálogo N.° 03 SUNAT).
 public sealed record LineaDocumentoElectronicoEntrada(
-    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    int NumeroLinea, string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int IdLineaDocumentoElectronico = 0);
