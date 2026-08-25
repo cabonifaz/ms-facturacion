@@ -73,6 +73,7 @@ public sealed class DocumentosElectronicosController(
     ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
+    ObtenerIdDocumentoElectronicoPorTokenCasoDeUso obtenerIdPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
@@ -188,6 +189,16 @@ public sealed class DocumentosElectronicosController(
     public async Task<IActionResult> ObtenerPorToken(string token, CancellationToken cancellationToken)
     {
         var resultado = await obtenerPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Variante mínima de ObtenerPorToken: solo el Id/IdInquilino, para que maximlian3_backend arme
+    // su propia consulta (pedidos del documento) contra su base. Mismo criterio de exposición
+    // pública que ObtenerPorToken.
+    [HttpGet("token/{token}/id")]
+    public async Task<IActionResult> ObtenerIdPorToken(string token, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerIdPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
         return ResponderSegunEnvelope(resultado);
     }
 

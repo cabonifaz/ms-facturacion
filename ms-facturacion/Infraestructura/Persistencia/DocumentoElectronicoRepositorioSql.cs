@@ -436,6 +436,40 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<IdentificadorDocumentoPorToken>> ObtenerIdPorTokenAsync(
+        string tokenPublico, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerIdPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IdentificadorDocumentoPorToken>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var identificador = new IdentificadorDocumentoPorToken(
+                lector.GetInt32(lector.GetOrdinal("IdDocumentoElectronico")),
+                lector.GetInt32(lector.GetOrdinal("IdInquilino")));
+
+            return ResultadoOperacion<IdentificadorDocumentoPorToken>.DeExito(mensaje, identificador);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IdentificadorDocumentoPorToken>.DeErrorSistema(ex.Message);
+        }
+    }
+
     public async Task<ResultadoOperacion<ResultadoPaginado<DocumentoElectronicoResumen>>> ListarAsync(
         int idInquilino, int idEmpresa, string? estadoCodigo, string? busqueda, DateOnly? fechaDesde, DateOnly? fechaHasta,
         int numeroPagina, int tamanoPagina, CancellationToken cancellationToken)

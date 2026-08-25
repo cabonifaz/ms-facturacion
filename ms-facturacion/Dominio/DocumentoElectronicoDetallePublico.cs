@@ -9,6 +9,10 @@ public sealed record DocumentoElectronicoDetallePublico(
     ReferenciaDocumentoElectronicaPublica? Referencia,
     IReadOnlyList<CuotaDocumentoElectronicaPublica> Cuotas);
 
+/// Resultado de ObtenerIdPorTokenAsync — solo lo mínimo para que maximlian3_backend arme su propia
+/// consulta (pedidos del documento) contra su base. IdInquilino equivale a IdEmpresa en maximlian3.
+public sealed record IdentificadorDocumentoPorToken(int IdDocumentoElectronico, int IdInquilino);
+
 public sealed record DocumentoElectronicoPublico(
     string? NumeroReferencia, string TipoDocumentoCodigo, string Serie, int Correlativo, string EstadoCodigo,
     DateOnly FechaEmision, TimeOnly HoraEmision, string MonedaCodigo, decimal? TipoCambio, string TipoOperacionCodigo, string? FormaPagoCodigo,
