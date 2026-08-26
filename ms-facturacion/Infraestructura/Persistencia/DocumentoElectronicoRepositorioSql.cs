@@ -1036,6 +1036,131 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
+    public async Task<ResultadoOperacion<MontosFacturacion>> ObtenerMontosFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_Facturacion_ObtenerMontosFacturacion", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<MontosFacturacion>(idTipoMensaje, mensaje, default);
+            }
+
+            await lector.NextResultAsync(cancellationToken);
+            await lector.ReadAsync(cancellationToken);
+
+            var montos = new MontosFacturacion(
+                lector.GetDecimal(lector.GetOrdinal("TotalFacturado")),
+                lector.GetDecimal(lector.GetOrdinal("TotalNotasCredito")),
+                lector.GetDecimal(lector.GetOrdinal("TotalNotasDebito")),
+                lector.GetString(lector.GetOrdinal("MonedaIcono")));
+
+            return ResultadoOperacion<MontosFacturacion>.DeExito(mensaje, montos);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<MontosFacturacion>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IReadOnlyList<DesgloseEstadoFacturacion>>> ObtenerDesgloseEstadoFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, int? idTipoDocumentoMaestro,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_Facturacion_ObtenerDesgloseEstado", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", (object?)idTipoDocumentoMaestro ?? DBNull.Value);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<DesgloseEstadoFacturacion>>(idTipoMensaje, mensaje, default);
+            }
+
+            var desglose = new List<DesgloseEstadoFacturacion>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                desglose.Add(new DesgloseEstadoFacturacion(
+                    LeerNullableInt(lector, "IdEstadoMaestro"),
+                    lector.GetString(lector.GetOrdinal("Estado")),
+                    lector.GetInt32(lector.GetOrdinal("CantidadFacturas")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoFacturado"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<DesgloseEstadoFacturacion>>.DeExito(mensaje, desglose);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<DesgloseEstadoFacturacion>>.DeErrorSistema(ex.Message);
+        }
+    }
+
+    public async Task<ResultadoOperacion<IReadOnlyList<EvolucionFacturacion>>> ObtenerEvolucionFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, int granularidad,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conexion = new SqlConnection(CadenaConexion);
+            await using var comando = new SqlCommand("SP_Facturacion_ObtenerEvolucion", conexion) { CommandType = CommandType.StoredProcedure };
+
+            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@intGranularidad", granularidad);
+
+            await conexion.OpenAsync(cancellationToken);
+            await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
+
+            var (idTipoMensaje, mensaje) = await LeerCabeceraAsync(lector, cancellationToken);
+            if (idTipoMensaje != TipoMensaje.Exito)
+            {
+                return new ResultadoOperacion<IReadOnlyList<EvolucionFacturacion>>(idTipoMensaje, mensaje, default);
+            }
+
+            var serie = new List<EvolucionFacturacion>();
+            await lector.NextResultAsync(cancellationToken);
+            while (await lector.ReadAsync(cancellationToken))
+            {
+                serie.Add(new EvolucionFacturacion(
+                    lector.GetString(lector.GetOrdinal("Periodo")),
+                    lector.GetString(lector.GetOrdinal("Etiqueta")),
+                    lector.GetInt32(lector.GetOrdinal("CantidadPedidos")),
+                    lector.GetDecimal(lector.GetOrdinal("MontoFacturado"))));
+            }
+
+            return ResultadoOperacion<IReadOnlyList<EvolucionFacturacion>>.DeExito(mensaje, serie);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<IReadOnlyList<EvolucionFacturacion>>.DeErrorSistema(ex.Message);
+        }
+    }
+
     /// El orden de columnas debe coincidir exactamente con TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION.
     private static DataTable ConstruirTablaLineasEdicion(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas)
     {

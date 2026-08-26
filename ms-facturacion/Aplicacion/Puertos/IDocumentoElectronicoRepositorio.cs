@@ -133,4 +133,22 @@ public interface IDocumentoElectronicoRepositorio
     /// Notas, convertido a PEN, con el chequeo de fecha del documento afectado).
     Task<ResultadoOperacion<ResumenFacturacion>> ObtenerResumenFacturacionAsync(
         int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, CancellationToken cancellationToken);
+
+    /// Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    /// SP_Facturacion_ObtenerMontosFacturacion. Sin idCliente/idPais/idTipoTramite: esos filtros solo
+    /// existen en maximilian_staging (PEDIDO/CLIENTE/TARIFARIO), esta base no los puede cruzar.
+    Task<ResultadoOperacion<MontosFacturacion>> ObtenerMontosFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, CancellationToken cancellationToken);
+
+    /// Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    /// SP_Facturacion_ObtenerDesgloseEstado (top 5 por cantidad + "Otros").
+    Task<ResultadoOperacion<IReadOnlyList<DesgloseEstadoFacturacion>>> ObtenerDesgloseEstadoFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, int? idTipoDocumentoMaestro,
+        CancellationToken cancellationToken);
+
+    /// Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    /// SP_Facturacion_ObtenerEvolucion. granularidad: 1=Día, 2=Semana, 3=Mes, 4=Año.
+    Task<ResultadoOperacion<IReadOnlyList<EvolucionFacturacion>>> ObtenerEvolucionFacturacionAsync(
+        int idInquilino, int idEmpresa, DateOnly? fechaDesde, DateOnly? fechaHasta, int granularidad,
+        CancellationToken cancellationToken);
 }

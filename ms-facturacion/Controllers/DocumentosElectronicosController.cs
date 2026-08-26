@@ -78,6 +78,9 @@ public sealed class DocumentosElectronicosController(
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
     ObtenerResumenFacturacionCasoDeUso obtenerResumenFacturacionCasoDeUso,
+    ObtenerMontosFacturacionCasoDeUso obtenerMontosFacturacionCasoDeUso,
+    ObtenerDesgloseEstadoFacturacionCasoDeUso obtenerDesgloseEstadoFacturacionCasoDeUso,
+    ObtenerEvolucionFacturacionCasoDeUso obtenerEvolucionFacturacionCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -270,6 +273,45 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await obtenerResumenFacturacionCasoDeUso.EjecutarAsync(
             idInquilino, idEmpresa, fechaDesde, fechaHasta, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    // SP_Facturacion_ObtenerMontosFacturacion. Sin idCliente/idPais/idTipoTramite (ver comentario del puerto).
+    [HttpGet("resumen-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerMontosFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerMontosFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    // SP_Facturacion_ObtenerDesgloseEstado (top 5 por cantidad + "Otros").
+    [HttpGet("desglose-estado-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerDesgloseEstadoFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, [FromQuery] int? idTipoDocumentoMaestro, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerDesgloseEstadoFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, idTipoDocumentoMaestro, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver SP_Facturacion_ObtenerEvolucion.
+    // granularidad: 1=Día, 2=Semana, 3=Mes, 4=Año.
+    [HttpGet("evolucion-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerEvolucionFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, [FromQuery] int granularidad, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerEvolucionFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, granularidad, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }
