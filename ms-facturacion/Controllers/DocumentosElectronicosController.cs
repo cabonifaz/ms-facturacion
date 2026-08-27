@@ -12,7 +12,7 @@ public sealed record ClientePeticion(
 public sealed record DocumentoAfectadoPeticion(int IdDocumentoElectronicoRelacionado, int IdMotivoMaestro);
 
 public sealed record ItemPeticion(
-    int NumeroLinea, string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    int NumeroLinea, string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv);
 
@@ -33,7 +33,7 @@ public sealed record AnularManualmentePeticion(string Motivo, DateTime FechaAnul
 /// Línea dentro de "Guardar cambios" en lote — IdLineaDocumentoElectronico es 0 (u omitido) para una línea
 /// nueva, o el id existente para actualizar una ya guardada. Una línea que no venga en el arreglo se da de baja.
 public sealed record LineaEdicionPeticion(
-    string ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
+    string? ProductoCodigo, string? ProductoSunatCodigo, string Descripcion, int IdUnidadMedidaMaestro,
     decimal Cantidad, decimal ValorUnitario, decimal MontoDescuento,
     int IdAfectacionIgvMaestro, decimal PorcentajeIgv, int NumeroLinea, int IdLineaDocumentoElectronico = 0);
 
@@ -73,10 +73,14 @@ public sealed class DocumentosElectronicosController(
     ListarErroresUltimoEnvioCasoDeUso listarErroresUltimoEnvioCasoDeUso,
     ObtenerUrlDescargaDocumentoCasoDeUso obtenerUrlDescargaCasoDeUso,
     ObtenerDocumentoElectronicoPorTokenCasoDeUso obtenerPorTokenCasoDeUso,
+    ObtenerIdDocumentoElectronicoPorTokenCasoDeUso obtenerIdPorTokenCasoDeUso,
     ObtenerUrlDescargaPorTokenCasoDeUso obtenerUrlDescargaPorTokenCasoDeUso,
     ObtenerTokenVerificacionDocumentoCasoDeUso obtenerTokenVerificacionCasoDeUso,
     ObtenerParaNotaCasoDeUso obtenerParaNotaCasoDeUso,
     ObtenerResumenFacturacionCasoDeUso obtenerResumenFacturacionCasoDeUso,
+    ObtenerMontosFacturacionCasoDeUso obtenerMontosFacturacionCasoDeUso,
+    ObtenerDesgloseEstadoFacturacionCasoDeUso obtenerDesgloseEstadoFacturacionCasoDeUso,
+    ObtenerEvolucionFacturacionCasoDeUso obtenerEvolucionFacturacionCasoDeUso,
     IHostEnvironment entorno) : ControllerBase
 {
     // TODO: reemplazar por el usuario ejecutor real una vez definida la autenticación servicio-a-servicio con maximlian3_backend.
@@ -191,6 +195,16 @@ public sealed class DocumentosElectronicosController(
         return ResponderSegunEnvelope(resultado);
     }
 
+    // Variante mínima de ObtenerPorToken: solo el Id/IdInquilino, para que maximlian3_backend arme
+    // su propia consulta (pedidos del documento) contra su base. Mismo criterio de exposición
+    // pública que ObtenerPorToken.
+    [HttpGet("token/{token}/id")]
+    public async Task<IActionResult> ObtenerIdPorToken(string token, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerIdPorTokenCasoDeUso.EjecutarAsync(token, cancellationToken);
+        return ResponderSegunEnvelope(resultado);
+    }
+
     // tipoArchivo: "Xml" o "Pdf". Mismo criterio que ObtenerPorToken.
     [HttpGet("token/{token}/url-descarga")]
     public async Task<IActionResult> ObtenerUrlDescargaPorToken(
@@ -259,6 +273,45 @@ public sealed class DocumentosElectronicosController(
     {
         var resultado = await obtenerResumenFacturacionCasoDeUso.EjecutarAsync(
             idInquilino, idEmpresa, fechaDesde, fechaHasta, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    // SP_Facturacion_ObtenerMontosFacturacion. Sin idCliente/idPais/idTipoTramite (ver comentario del puerto).
+    [HttpGet("resumen-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerMontosFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerMontosFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver
+    // SP_Facturacion_ObtenerDesgloseEstado (top 5 por cantidad + "Otros").
+    [HttpGet("desglose-estado-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerDesgloseEstadoFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, [FromQuery] int? idTipoDocumentoMaestro, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerDesgloseEstadoFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, idTipoDocumentoMaestro, cancellationToken);
+
+        return ResponderSegunEnvelope(resultado);
+    }
+
+    // Dashboard de Facturación Analítica (Gerente) en maximlian3_backend — ver SP_Facturacion_ObtenerEvolucion.
+    // granularidad: 1=Día, 2=Semana, 3=Mes, 4=Año.
+    [HttpGet("evolucion-facturacion-analitica")]
+    public async Task<IActionResult> ObtenerEvolucionFacturacion(
+        [FromQuery] int idInquilino, [FromQuery] int idEmpresa, [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta, [FromQuery] int granularidad, CancellationToken cancellationToken)
+    {
+        var resultado = await obtenerEvolucionFacturacionCasoDeUso.EjecutarAsync(
+            idInquilino, idEmpresa, fechaDesde, fechaHasta, granularidad, cancellationToken);
 
         return ResponderSegunEnvelope(resultado);
     }

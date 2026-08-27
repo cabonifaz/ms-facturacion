@@ -317,7 +317,11 @@ public sealed class ConstructorXmlComprobanteServicio : IConstructorXmlComproban
                             new XElement(Cbc + "TaxTypeCode", linea.TributoTaxTypeCode))))),
             new XElement(Cac + "Item",
                 new XElement(Cbc + "Description", linea.Descripcion),
-                new XElement(Cac + "SellersItemIdentification", new XElement(Cbc + "ID", linea.ProductoCodigo))),
+                // SellersItemIdentification es opcional para SUNAT (Anexo N.1) — se omite entero en vez de
+                // emitirlo con un cbc:ID vacío, que SUNAT podría rechazar igual que si faltara el dato.
+                string.IsNullOrWhiteSpace(linea.ProductoCodigo)
+                    ? null
+                    : new XElement(Cac + "SellersItemIdentification", new XElement(Cbc + "ID", linea.ProductoCodigo))),
             new XElement(Cac + "Price",
                 new XElement(Cbc + "PriceAmount", new XAttribute("currencyID", moneda), linea.ValorUnitario.ToString("F6", CultureInfo.InvariantCulture))));
 }
