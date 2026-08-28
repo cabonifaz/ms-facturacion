@@ -319,6 +319,14 @@ public sealed class EnviarDocumentoElectronicoASunatCasoDeUso(
                     UsuarioWorker, idInquilino,
                     new ErrorDocumento(cabecera.IdDocumentoElectronico, transmision.Datos, "Sunat", string.Empty, envio.Mensaje, null, "Error"),
                     cancellationToken);
+
+                // El documento quedó con un estado final real (ErrorSunat), no solo un fallo de
+                // esta llamada — se devuelve como éxito con ese estado (igual que Aceptado/
+                // Rechazado) en vez de ReglaDeNegocio+Datos=null, para que el llamador (maximlian3)
+                // sincronice PEDIDO_FACTURA_LINEA por el mismo camino síncrono normal.
+                return ResultadoOperacion<ResultadoEnvioSunat>.DeExito(
+                    "SUNAT no devolvió un CDR utilizable.",
+                    new ResultadoEnvioSunat(EstadoMaestroCodigo.ErrorSunat, string.Empty, envio.Mensaje, [], [], []));
             }
             else
             {
