@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -23,41 +23,33 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchIdExterno", idExterno);
-            comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
-            comando.Parameters.AddWithValue("@dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.Add("@tmHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
-            comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
-            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
-            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
-            comando.Parameters.AddWithValue("@vchClienteNumeroDocumento", cliente.NumeroDocumento);
-            comando.Parameters.AddWithValue("@vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchClienteCorreo", (object?)cliente.Correo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intClientePaisCodigo", cliente.PaisCodigo);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdMotivoMaestro", (object?)documentoAfectado?.IdMotivoMaestro ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchIdExterno", idExterno);
+            comando.Parameters.AddWithValue("@p_vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdTipoDocumentoMaestro", idTipoDocumentoMaestro);
+            comando.Parameters.AddWithValue("@p_dtFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.Add("@p_tmHoraEmision", MySqlDbType.Time).Value = horaEmision.ToTimeSpan();
+            comando.Parameters.AddWithValue("@p_intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@p_decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdTipoOperacionMaestro", idTipoOperacionMaestro);
+            comando.Parameters.AddWithValue("@p_intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intClienteTipoDocumentoSunat", cliente.IdTipoDocumentoSunat);
+            comando.Parameters.AddWithValue("@p_vchClienteNumeroDocumento", cliente.NumeroDocumento);
+            comando.Parameters.AddWithValue("@p_vchClienteNombre", (object?)cliente.Nombre ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchClienteCorreo", (object?)cliente.Correo ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchClienteDireccion", (object?)cliente.Direccion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intClientePaisCodigo", cliente.PaisCodigo);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronicoRelacionado", (object?)documentoAfectado?.IdDocumentoElectronicoRelacionado ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdMotivoMaestro", (object?)documentoAfectado?.IdMotivoMaestro ?? DBNull.Value);
 
-            var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
-            tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO";
-            tvpLineas.Value = ConstruirTablaLineas(lineas);
-
-            var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
-            tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO";
-            tvpCuotas.Value = ConstruirTablaCuotas(cuotas);
-
-            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
-            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO";
-            tvpCamposExtra.Value = ConstruirTablaCamposExtra(camposExtra);
+            comando.Parameters.AddWithValue("@p_jsonLineas", ConstruirJsonLineas(lineas));
+            comando.Parameters.AddWithValue("@p_jsonCuotas", ConstruirJsonCuotas(cuotas));
+            comando.Parameters.AddWithValue("@p_jsonCamposExtra", ConstruirJsonCamposExtra(camposExtra));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -91,11 +83,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -232,11 +224,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerTokenPublico", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ObtenerTokenPublico", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -264,11 +256,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerParaNota", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ObtenerParaNota", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -314,10 +306,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ObtenerPorToken", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+            comando.Parameters.AddWithValue("@p_vchTokenPublico", tokenPublico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -441,10 +433,10 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerIdPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ObtenerIdPorToken", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
+            comando.Parameters.AddWithValue("@p_vchTokenPublico", tokenPublico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -476,17 +468,17 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchEstadoCodigo", (object?)estadoCodigo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchEstadoCodigo", (object?)estadoCodigo ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -532,18 +524,18 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarParaPedidoFactura", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ListarParaPedidoFactura", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchEstadoCodigo", (object?)estadoCodigo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchEstadoCodigo", (object?)estadoCodigo ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -592,12 +584,12 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarParaSireRvie", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ListarParaSireRvie", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtPeriodo", periodo.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtPeriodo", periodo.ToDateTime(TimeOnly.MinValue));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -655,18 +647,18 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ActualizarEstadoSunat", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ActualizarEstadoSunat", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intEstadoCodigo", (int)estadoCodigo);
-            comando.Parameters.AddWithValue("@vchSunatHash", (object?)sunatHash ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatTicket", (object?)sunatTicket ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtmFecha", fecha);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intEstadoCodigo", (int)estadoCodigo);
+            comando.Parameters.AddWithValue("@p_vchSunatHash", (object?)sunatHash ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatTicket", (object?)sunatTicket ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtmFecha", fecha);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -698,14 +690,14 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_AnularManualmente", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_AnularManualmente", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchMotivo", motivo);
-            comando.Parameters.AddWithValue("@dtmFechaAnulacion", fechaAnulacion);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchMotivo", motivo);
+            comando.Parameters.AddWithValue("@p_dtmFechaAnulacion", fechaAnulacion);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -739,11 +731,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_PrevisualizarAnulacionManual", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_PrevisualizarAnulacionManual", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -781,14 +773,14 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ActualizarFechaEmision", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ActualizarFechaEmision", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@dtmFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.Add("@timHoraEmision", SqlDbType.Time).Value = horaEmision.ToTimeSpan();
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_dtmFechaEmision", fechaEmision.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.Add("@p_timHoraEmision", MySqlDbType.Time).Value = horaEmision.ToTimeSpan();
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -809,12 +801,12 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_EliminarBorrador", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_EliminarBorrador", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -835,12 +827,12 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ValidarSaldoNotaCredito", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ValidarSaldoNotaCredito", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -864,31 +856,23 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_GuardarCambios", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_GuardarCambios", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchIdExterno", idExterno);
-            comando.Parameters.AddWithValue("@intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdMonedaMaestro", idMonedaMaestro);
-            comando.Parameters.AddWithValue("@decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdTipoOperacionMaestro", idTipoOperacionMaestro);
-            comando.Parameters.AddWithValue("@intIdMotivoMaestro", (object?)idMotivoMaestro ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchIdExterno", idExterno);
+            comando.Parameters.AddWithValue("@p_intIdFormaPago", (object?)idFormaPago ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchNumeroReferencia", (object?)numeroReferencia ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdMonedaMaestro", idMonedaMaestro);
+            comando.Parameters.AddWithValue("@p_decTipoCambio", (object?)tipoCambio ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdTipoOperacionMaestro", idTipoOperacionMaestro);
+            comando.Parameters.AddWithValue("@p_intIdMotivoMaestro", (object?)idMotivoMaestro ?? DBNull.Value);
 
-            var tvpLineas = comando.Parameters.Add("@tvpLineas", SqlDbType.Structured);
-            tvpLineas.TypeName = "dbo.TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION";
-            tvpLineas.Value = ConstruirTablaLineasEdicion(lineas);
-
-            var tvpCuotas = comando.Parameters.Add("@tvpCuotas", SqlDbType.Structured);
-            tvpCuotas.TypeName = "dbo.TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION";
-            tvpCuotas.Value = ConstruirTablaCuotasEdicion(cuotas);
-
-            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
-            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION";
-            tvpCamposExtra.Value = ConstruirTablaCamposExtraEdicion(camposExtra);
+            comando.Parameters.AddWithValue("@p_jsonLineas", ConstruirJsonLineasEdicion(lineas));
+            comando.Parameters.AddWithValue("@p_jsonCuotas", ConstruirJsonCuotasEdicion(cuotas));
+            comando.Parameters.AddWithValue("@p_jsonCamposExtra", ConstruirJsonCamposExtraEdicion(camposExtra));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -928,15 +912,15 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CuotaDocumentoElectronico_ActualizarEstado", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CuotaDocumentoElectronico_ActualizarEstado", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intIdCuotaDocumentoElectronico", idCuotaDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intEstadoCuotaCodigo", (int)estadoCuotaCodigo);
-            comando.Parameters.AddWithValue("@dtmFechaPago", (object?)fechaPago ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdCuotaDocumentoElectronico", idCuotaDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intEstadoCuotaCodigo", (int)estadoCuotaCodigo);
+            comando.Parameters.AddWithValue("@p_dtmFechaPago", (object?)fechaPago ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -962,11 +946,11 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ListarEventosRecientes", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ListarEventosRecientes", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intUltimoIdEvento", ultimoIdEvento);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intUltimoIdEvento", ultimoIdEvento);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -1002,13 +986,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_DocumentoElectronico_ObtenerResumenFacturacion", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_DocumentoElectronico_ObtenerResumenFacturacion", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -1041,13 +1025,13 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Facturacion_ObtenerMontosFacturacion", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Facturacion_ObtenerMontosFacturacion", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -1081,14 +1065,14 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Facturacion_ObtenerDesgloseEstado", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Facturacion_ObtenerDesgloseEstado", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdTipoDocumentoMaestro", (object?)idTipoDocumentoMaestro ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdTipoDocumentoMaestro", (object?)idTipoDocumentoMaestro ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -1124,14 +1108,14 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Facturacion_ObtenerEvolucion", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Facturacion_ObtenerEvolucion", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intGranularidad", granularidad);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaDesde", (object?)fechaDesde?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_dtFechaHasta", (object?)fechaHasta?.ToDateTime(TimeOnly.MinValue) ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intGranularidad", granularidad);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -1161,58 +1145,84 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         }
     }
 
-    /// El orden de columnas debe coincidir exactamente con TVP_LINEA_DOCUMENTO_ELECTRONICO_EDICION.
-    private static DataTable ConstruirTablaLineasEdicion(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("IdLineaDocumentoElectronico", typeof(int));
-        tabla.Columns.Add("NumeroLinea", typeof(int));
-        tabla.Columns.Add("ProductoCodigo", typeof(string));
-        tabla.Columns.Add("ProductoSunatCodigo", typeof(string));
-        tabla.Columns.Add("Descripcion", typeof(string));
-        tabla.Columns.Add("IdUnidadMedidaMaestro", typeof(int));
-        tabla.Columns.Add("Cantidad", typeof(decimal));
-        tabla.Columns.Add("ValorUnitario", typeof(decimal));
-        tabla.Columns.Add("MontoDescuento", typeof(decimal));
-        tabla.Columns.Add("IdAfectacionIgvMaestro", typeof(int));
-        tabla.Columns.Add("PorcentajeIgv", typeof(decimal));
-
-        foreach (var linea in lineas)
+    /// Las propiedades del proyectado deben coincidir exactamente (nombre y forma) con las columnas leídas
+    /// por JSON_TABLE(p_jsonLineas, ...) en SP_DocumentoElectronico_Insertar (facturacion-mysql).
+    private static string ConstruirJsonLineas(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas) =>
+        System.Text.Json.JsonSerializer.Serialize(lineas.Select(linea => new
         {
-            tabla.Rows.Add(
-                linea.IdLineaDocumentoElectronico, linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
-                linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
-                linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
-        }
+            linea.NumeroLinea,
+            ProductoCodigo = EscribirNullableString(linea.ProductoCodigo),
+            linea.ProductoSunatCodigo,
+            linea.Descripcion,
+            linea.IdUnidadMedidaMaestro,
+            linea.Cantidad,
+            linea.ValorUnitario,
+            linea.MontoDescuento,
+            linea.IdAfectacionIgvMaestro,
+            linea.PorcentajeIgv
+        }));
 
-        return tabla;
-    }
-
-    /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO_EDICION.
-    private static DataTable ConstruirTablaCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("IdCuotaDocumentoElectronico", typeof(int));
-        tabla.Columns.Add("NumeroCuota", typeof(int));
-        tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
-        tabla.Columns.Add("Monto", typeof(decimal));
-        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
-        tabla.Columns.Add("FechaPago", typeof(DateTime));
-
-        foreach (var cuota in cuotas)
+    /// Debe coincidir exactamente con las columnas leídas por JSON_TABLE(p_jsonCuotas, ...) en
+    /// SP_DocumentoElectronico_Insertar.
+    private static string ConstruirJsonCuotas(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas) =>
+        System.Text.Json.JsonSerializer.Serialize(cuotas.Select(cuota => new
         {
-            tabla.Rows.Add(
-                cuota.IdCuotaDocumentoElectronico, cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
-                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
-        }
+            cuota.NumeroCuota,
+            cuota.FechaVencimiento,
+            cuota.Monto,
+            cuota.IdEstadoCuotaMaestro,
+            cuota.FechaPago
+        }));
 
-        return tabla;
-    }
+    /// Debe coincidir exactamente con las columnas leídas por JSON_TABLE(p_jsonCamposExtra, ...) en
+    /// SP_DocumentoElectronico_Insertar.
+    private static string ConstruirJsonCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra) =>
+        System.Text.Json.JsonSerializer.Serialize(camposExtra.Select(campo => new { campo.Texto }));
+
+    /// Debe coincidir exactamente con las columnas leídas por JSON_TABLE(p_jsonLineas, ...) en
+    /// SP_DocumentoElectronico_GuardarCambios.
+    private static string ConstruirJsonLineasEdicion(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas) =>
+        System.Text.Json.JsonSerializer.Serialize(lineas.Select(linea => new
+        {
+            linea.IdLineaDocumentoElectronico,
+            linea.NumeroLinea,
+            ProductoCodigo = EscribirNullableString(linea.ProductoCodigo),
+            linea.ProductoSunatCodigo,
+            linea.Descripcion,
+            linea.IdUnidadMedidaMaestro,
+            linea.Cantidad,
+            linea.ValorUnitario,
+            linea.MontoDescuento,
+            linea.IdAfectacionIgvMaestro,
+            linea.PorcentajeIgv
+        }));
+
+    /// Debe coincidir exactamente con las columnas leídas por JSON_TABLE(p_jsonCuotas, ...) en
+    /// SP_DocumentoElectronico_GuardarCambios.
+    private static string ConstruirJsonCuotasEdicion(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas) =>
+        System.Text.Json.JsonSerializer.Serialize(cuotas.Select(cuota => new
+        {
+            cuota.IdCuotaDocumentoElectronico,
+            cuota.NumeroCuota,
+            cuota.FechaVencimiento,
+            cuota.Monto,
+            cuota.IdEstadoCuotaMaestro,
+            cuota.FechaPago
+        }));
+
+    /// Debe coincidir exactamente con las columnas leídas por JSON_TABLE(p_jsonCamposExtra, ...) en
+    /// SP_DocumentoElectronico_GuardarCambios.
+    private static string ConstruirJsonCamposExtraEdicion(IReadOnlyList<CampoExtraEntrada> camposExtra) =>
+        System.Text.Json.JsonSerializer.Serialize(camposExtra.Select(campo => new
+        {
+            campo.IdCampoExtraDocumentoElectronico,
+            campo.Texto
+        }));
 
     // IdPedidoFacturaLinea: SP_DocumentoElectronico_GuardarCambios no lo devuelve (a diferencia de
     // SP_DocumentoElectronico_Obtener) — el llamador ya lo mandó en la misma request que generó estas
     // líneas, no hace falta que el SP se lo confirme de vuelta.
-    private static LineaDocumentoElectronico LeerLinea(SqlDataReader lector) => new(
+    private static LineaDocumentoElectronico LeerLinea(MySqlDataReader lector) => new(
         lector.GetInt32(lector.GetOrdinal("IdLineaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroLinea")),
         null,
@@ -1236,7 +1246,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetDecimal(lector.GetOrdinal("ValorLinea")),
         lector.GetDecimal(lector.GetOrdinal("TotalLinea")));
 
-    private static CuotaDocumentoElectronico LeerCuota(SqlDataReader lector) => new(
+    private static CuotaDocumentoElectronico LeerCuota(MySqlDataReader lector) => new(
         lector.GetInt32(lector.GetOrdinal("IdCuotaDocumentoElectronico")),
         lector.GetInt32(lector.GetOrdinal("NumeroCuota")),
         DateOnly.FromDateTime(lector.GetDateTime(lector.GetOrdinal("FechaVencimiento"))),
@@ -1244,84 +1254,7 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
         lector.GetString(lector.GetOrdinal("EstadoCuotaCodigo")),
         lector.IsDBNull(lector.GetOrdinal("FechaPago")) ? null : lector.GetDateTime(lector.GetOrdinal("FechaPago")));
 
-    /// El orden de columnas debe coincidir exactamente con TVP_LINEA_DOCUMENTO_ELECTRONICO (02_CrearTipos_MsFacturacion.sql) —
-    /// una TVP basada en DataTable se mapea posicionalmente, no por nombre.
-    private static DataTable ConstruirTablaLineas(IReadOnlyList<LineaDocumentoElectronicoEntrada> lineas)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("NumeroLinea", typeof(int));
-        tabla.Columns.Add("ProductoCodigo", typeof(string));
-        tabla.Columns.Add("ProductoSunatCodigo", typeof(string));
-        tabla.Columns.Add("Descripcion", typeof(string));
-        tabla.Columns.Add("IdUnidadMedidaMaestro", typeof(int));
-        tabla.Columns.Add("Cantidad", typeof(decimal));
-        tabla.Columns.Add("ValorUnitario", typeof(decimal));
-        tabla.Columns.Add("MontoDescuento", typeof(decimal));
-        tabla.Columns.Add("IdAfectacionIgvMaestro", typeof(int));
-        tabla.Columns.Add("PorcentajeIgv", typeof(decimal));
-
-        foreach (var linea in lineas)
-        {
-            tabla.Rows.Add(
-                linea.NumeroLinea, EscribirNullableString(linea.ProductoCodigo), (object?)linea.ProductoSunatCodigo ?? DBNull.Value,
-                linea.Descripcion, linea.IdUnidadMedidaMaestro, linea.Cantidad, linea.ValorUnitario,
-                linea.MontoDescuento, linea.IdAfectacionIgvMaestro, linea.PorcentajeIgv);
-        }
-
-        return tabla;
-    }
-
-    /// El orden de columnas debe coincidir exactamente con TVP_CUOTA_DOCUMENTO_ELECTRONICO.
-    private static DataTable ConstruirTablaCuotas(IReadOnlyList<CuotaDocumentoElectronicoEntrada> cuotas)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("NumeroCuota", typeof(int));
-        tabla.Columns.Add("FechaVencimiento", typeof(DateTime));
-        tabla.Columns.Add("Monto", typeof(decimal));
-        tabla.Columns.Add("IdEstadoCuotaMaestro", typeof(int));
-        tabla.Columns.Add("FechaPago", typeof(DateTime));
-
-        foreach (var cuota in cuotas)
-        {
-            tabla.Rows.Add(
-                cuota.NumeroCuota, cuota.FechaVencimiento.ToDateTime(TimeOnly.MinValue), cuota.Monto,
-                cuota.IdEstadoCuotaMaestro, (object?)cuota.FechaPago ?? DBNull.Value);
-        }
-
-        return tabla;
-    }
-
-    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO
-    /// (02_CrearTipos_MsFacturacion.sql) — una TVP basada en DataTable se mapea posicionalmente, no por nombre.
-    private static DataTable ConstruirTablaCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("Texto", typeof(string));
-
-        foreach (var campo in camposExtra)
-        {
-            tabla.Rows.Add(campo.Texto);
-        }
-
-        return tabla;
-    }
-
-    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO_EDICION.
-    private static DataTable ConstruirTablaCamposExtraEdicion(IReadOnlyList<CampoExtraEntrada> camposExtra)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("IdCampoExtraDocumentoElectronico", typeof(int));
-        tabla.Columns.Add("Texto", typeof(string));
-
-        foreach (var campo in camposExtra)
-        {
-            tabla.Rows.Add(campo.IdCampoExtraDocumentoElectronico, campo.Texto);
-        }
-
-        return tabla;
-    }
-
-    private static string? LeerNullableString(SqlDataReader lector, string columna)
+    private static string? LeerNullableString(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
@@ -1329,35 +1262,35 @@ public sealed class DocumentoElectronicoRepositorioSql(IConfiguration configurac
 
     /// Para columnas opcionales tipo string (p.ej. ProductoCodigo): "" se guarda como NULL, no como cadena
     /// vacía — evita dos representaciones distintas de "sin dato" en la misma columna.
-    private static object EscribirNullableString(string? valor) =>
-        string.IsNullOrWhiteSpace(valor) ? DBNull.Value : valor;
+    private static string? EscribirNullableString(string? valor) =>
+        string.IsNullOrWhiteSpace(valor) ? null : valor;
 
-    private static decimal? LeerNullableDecimal(SqlDataReader lector, string columna)
+    private static decimal? LeerNullableDecimal(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetDecimal(ordinal);
     }
 
-    private static int? LeerNullableInt(SqlDataReader lector, string columna)
+    private static int? LeerNullableInt(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetInt32(ordinal);
     }
 
-    private static DateOnly? LeerNullableDateOnly(SqlDataReader lector, string columna)
+    private static DateOnly? LeerNullableDateOnly(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : DateOnly.FromDateTime(lector.GetDateTime(ordinal));
     }
 
-    private static DateTime? LeerNullableDateTime(SqlDataReader lector, string columna)
+    private static DateTime? LeerNullableDateTime(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetDateTime(ordinal);
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

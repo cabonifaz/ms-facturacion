@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -21,22 +21,22 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchAmbienteCodigo", ambienteCodigo);
-            comando.Parameters.AddWithValue("@vchTipoProveedorCodigo", tipoProveedorCodigo);
-            comando.Parameters.AddWithValue("@vchNombreProveedor", (object?)nombreProveedor ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdCertificado", idCertificado);
-            comando.Parameters.AddWithValue("@vchUrlEnvioFacturaBoletaNota", (object?)urlEnvioFacturaBoletaNota ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlEnvioRetencionPercepcion", (object?)urlEnvioRetencionPercepcion ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlEnvioGuiaRemision", (object?)urlEnvioGuiaRemision ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlConsultaEstadoCdr", (object?)urlConsultaEstadoCdr ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlConsultaValidez", (object?)urlConsultaValidez ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchAmbienteCodigo", ambienteCodigo);
+            comando.Parameters.AddWithValue("@p_vchTipoProveedorCodigo", tipoProveedorCodigo);
+            comando.Parameters.AddWithValue("@p_vchNombreProveedor", (object?)nombreProveedor ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdCertificado", idCertificado);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioFacturaBoletaNota", (object?)urlEnvioFacturaBoletaNota ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioRetencionPercepcion", (object?)urlEnvioRetencionPercepcion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioGuiaRemision", (object?)urlEnvioGuiaRemision ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlConsultaEstadoCdr", (object?)urlConsultaEstadoCdr ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlConsultaValidez", (object?)urlConsultaValidez ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -64,11 +64,11 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -113,12 +113,12 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_ObtenerPorEmpresaYAmbiente", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_ObtenerPorEmpresaYAmbiente", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchAmbienteCodigo", ambienteCodigo);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchAmbienteCodigo", ambienteCodigo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -156,13 +156,13 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -207,22 +207,22 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
-            comando.Parameters.AddWithValue("@vchAmbienteCodigo", ambienteCodigo);
-            comando.Parameters.AddWithValue("@vchTipoProveedorCodigo", tipoProveedorCodigo);
-            comando.Parameters.AddWithValue("@vchNombreProveedor", (object?)nombreProveedor ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdCertificado", idCertificado);
-            comando.Parameters.AddWithValue("@vchUrlEnvioFacturaBoletaNota", (object?)urlEnvioFacturaBoletaNota ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlEnvioRetencionPercepcion", (object?)urlEnvioRetencionPercepcion ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlEnvioGuiaRemision", (object?)urlEnvioGuiaRemision ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlConsultaEstadoCdr", (object?)urlConsultaEstadoCdr ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchUrlConsultaValidez", (object?)urlConsultaValidez ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
+            comando.Parameters.AddWithValue("@p_vchAmbienteCodigo", ambienteCodigo);
+            comando.Parameters.AddWithValue("@p_vchTipoProveedorCodigo", tipoProveedorCodigo);
+            comando.Parameters.AddWithValue("@p_vchNombreProveedor", (object?)nombreProveedor ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdCertificado", idCertificado);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioFacturaBoletaNota", (object?)urlEnvioFacturaBoletaNota ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioRetencionPercepcion", (object?)urlEnvioRetencionPercepcion ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlEnvioGuiaRemision", (object?)urlEnvioGuiaRemision ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlConsultaEstadoCdr", (object?)urlConsultaEstadoCdr ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUrlConsultaValidez", (object?)urlConsultaValidez ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -250,12 +250,12 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ConfiguracionFacturacionEmpresa_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ConfiguracionFacturacionEmpresa_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdConfiguracionFacturacionEmpresa", idConfiguracionFacturacionEmpresa);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -278,14 +278,14 @@ public sealed class ConfiguracionFacturacionEmpresaRepositorioSql(IConfiguration
         }
     }
 
-    private static string? LeerNullableString(SqlDataReader lector, string columna)
+    private static string? LeerNullableString(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

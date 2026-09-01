@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -18,20 +18,20 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ArchivoDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ArchivoDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", (object?)archivo.IdDocumentoElectronico ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdLoteDocumento", (object?)archivo.IdLoteDocumento ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchTipoArchivoCodigo", archivo.TipoArchivoCodigo);
-            comando.Parameters.AddWithValue("@intIdTransmisionSunat", (object?)archivo.IdTransmisionSunat ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchNombreArchivo", archivo.NombreArchivo);
-            comando.Parameters.AddWithValue("@vchRutaAlmacenamiento", archivo.RutaAlmacenamiento);
-            comando.Parameters.AddWithValue("@vchTipoContenido", archivo.TipoContenido);
-            comando.Parameters.AddWithValue("@chrHashSha256", archivo.HashSha256);
-            comando.Parameters.AddWithValue("@bigTamanoBytes", archivo.TamanoBytes);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", (object?)archivo.IdDocumentoElectronico ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdLoteDocumento", (object?)archivo.IdLoteDocumento ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchTipoArchivoCodigo", archivo.TipoArchivoCodigo);
+            comando.Parameters.AddWithValue("@p_intIdTransmisionSunat", (object?)archivo.IdTransmisionSunat ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchNombreArchivo", archivo.NombreArchivo);
+            comando.Parameters.AddWithValue("@p_vchRutaAlmacenamiento", archivo.RutaAlmacenamiento);
+            comando.Parameters.AddWithValue("@p_vchTipoContenido", archivo.TipoContenido);
+            comando.Parameters.AddWithValue("@p_chrHashSha256", archivo.HashSha256);
+            comando.Parameters.AddWithValue("@p_bigTamanoBytes", archivo.TamanoBytes);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -59,12 +59,12 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ArchivoDocumento_ObtenerXmlYPdf", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ArchivoDocumento_ObtenerXmlYPdf", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchTipoArchivoCodigo", tipoArchivoCodigo);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchTipoArchivoCodigo", tipoArchivoCodigo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -96,11 +96,11 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ArchivoDocumento_ObtenerXmlYPdfPorToken", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ArchivoDocumento_ObtenerXmlYPdfPorToken", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchTokenPublico", tokenPublico);
-            comando.Parameters.AddWithValue("@vchTipoArchivoCodigo", tipoArchivoCodigo);
+            comando.Parameters.AddWithValue("@p_vchTokenPublico", tokenPublico);
+            comando.Parameters.AddWithValue("@p_vchTipoArchivoCodigo", tipoArchivoCodigo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -128,7 +128,7 @@ public sealed class ArchivoDocumentoRepositorioSql(IConfiguration configuracion)
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

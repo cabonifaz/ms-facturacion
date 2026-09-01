@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -20,18 +20,18 @@ public sealed class CredencialInquilinoRepositorioSql(
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchTipoCredencialCodigo", tipoCredencialCodigo);
-            comando.Parameters.AddWithValue("@vchUsuario", usuario);
-            comando.Parameters.Add("@varbinValorCifrado", SqlDbType.VarBinary).Value = valorCifrado;
-            comando.Parameters.Add("@varbinNonce", SqlDbType.VarBinary, 12).Value = nonce;
-            comando.Parameters.Add("@varbinTag", SqlDbType.VarBinary, 16).Value = tag;
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchTipoCredencialCodigo", tipoCredencialCodigo);
+            comando.Parameters.AddWithValue("@p_vchUsuario", usuario);
+            comando.Parameters.Add("@p_binValorCifrado", MySqlDbType.VarBinary).Value = valorCifrado;
+            comando.Parameters.Add("@p_binNonce", MySqlDbType.VarBinary, 12).Value = nonce;
+            comando.Parameters.Add("@p_binTag", MySqlDbType.VarBinary, 16).Value = tag;
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -59,11 +59,11 @@ public sealed class CredencialInquilinoRepositorioSql(
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCredencialInquilino", idCredencialInquilino);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCredencialInquilino", idCredencialInquilino);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -113,12 +113,12 @@ public sealed class CredencialInquilinoRepositorioSql(
 
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_ObtenerPorTipo", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_ObtenerPorTipo", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchTipoCredencialCodigo", tipoCredencialCodigo);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchTipoCredencialCodigo", tipoCredencialCodigo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -162,13 +162,13 @@ public sealed class CredencialInquilinoRepositorioSql(
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -211,17 +211,17 @@ public sealed class CredencialInquilinoRepositorioSql(
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCredencialInquilino", idCredencialInquilino);
-            comando.Parameters.AddWithValue("@vchUsuario", usuario);
-            comando.Parameters.Add("@varbinValorCifrado", SqlDbType.VarBinary).Value = valorCifrado;
-            comando.Parameters.Add("@varbinNonce", SqlDbType.VarBinary, 12).Value = nonce;
-            comando.Parameters.Add("@varbinTag", SqlDbType.VarBinary, 16).Value = tag;
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCredencialInquilino", idCredencialInquilino);
+            comando.Parameters.AddWithValue("@p_vchUsuario", usuario);
+            comando.Parameters.Add("@p_binValorCifrado", MySqlDbType.VarBinary).Value = valorCifrado;
+            comando.Parameters.Add("@p_binNonce", MySqlDbType.VarBinary, 12).Value = nonce;
+            comando.Parameters.Add("@p_binTag", MySqlDbType.VarBinary, 16).Value = tag;
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -249,12 +249,12 @@ public sealed class CredencialInquilinoRepositorioSql(
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CredencialInquilino_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CredencialInquilino_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCredencialInquilino", idCredencialInquilino);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCredencialInquilino", idCredencialInquilino);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -278,7 +278,7 @@ public sealed class CredencialInquilinoRepositorioSql(
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

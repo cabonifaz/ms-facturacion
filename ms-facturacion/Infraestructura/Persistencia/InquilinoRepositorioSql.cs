@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -18,13 +18,13 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Inquilino_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Inquilino_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@vchCodigo", codigo);
-            comando.Parameters.AddWithValue("@vchNombre", nombre);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_vchCodigo", codigo);
+            comando.Parameters.AddWithValue("@p_vchNombre", nombre);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -51,10 +51,10 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Inquilino_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Inquilino_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -91,12 +91,12 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Inquilino_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Inquilino_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -137,14 +137,14 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Inquilino_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Inquilino_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@vchCodigo", codigo);
-            comando.Parameters.AddWithValue("@vchNombre", nombre);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_vchCodigo", codigo);
+            comando.Parameters.AddWithValue("@p_vchNombre", nombre);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -172,11 +172,11 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Inquilino_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Inquilino_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -202,7 +202,7 @@ public sealed class InquilinoRepositorioSql(IConfiguration configuracion) : IInq
     /// Lee siempre el primer result set (IdTipoMensaje/Mensaje) de cualquier SP, per el contrato de AGENTS.md.
     /// Si no hay fila de cabecera, se asume IdTipoMensaje = 3 — nunca se interpreta como éxito.
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

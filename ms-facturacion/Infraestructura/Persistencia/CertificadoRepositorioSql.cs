@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -20,20 +20,20 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Certificado_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Certificado_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchRutaAlmacenamiento", rutaAlmacenamiento);
-            comando.Parameters.AddWithValue("@vchSujeto", sujeto);
-            comando.Parameters.AddWithValue("@vchEmisor", emisor);
-            comando.Parameters.AddWithValue("@vchNumeroSerie", numeroSerie);
-            comando.Parameters.AddWithValue("@vchHuellaDigital", huellaDigital);
-            comando.Parameters.AddWithValue("@dtValidoDesde", validoDesde.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@dtValidoHasta", validoHasta.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchRutaAlmacenamiento", rutaAlmacenamiento);
+            comando.Parameters.AddWithValue("@p_vchSujeto", sujeto);
+            comando.Parameters.AddWithValue("@p_vchEmisor", emisor);
+            comando.Parameters.AddWithValue("@p_vchNumeroSerie", numeroSerie);
+            comando.Parameters.AddWithValue("@p_vchHuellaDigital", huellaDigital);
+            comando.Parameters.AddWithValue("@p_dtValidoDesde", validoDesde.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_dtValidoHasta", validoHasta.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -60,11 +60,11 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Certificado_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Certificado_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCertificado", idCertificado);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCertificado", idCertificado);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -107,14 +107,14 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Certificado_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Certificado_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -159,20 +159,20 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Certificado_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Certificado_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCertificado", idCertificado);
-            comando.Parameters.AddWithValue("@vchRutaAlmacenamiento", rutaAlmacenamiento);
-            comando.Parameters.AddWithValue("@vchSujeto", sujeto);
-            comando.Parameters.AddWithValue("@vchEmisor", emisor);
-            comando.Parameters.AddWithValue("@vchNumeroSerie", numeroSerie);
-            comando.Parameters.AddWithValue("@vchHuellaDigital", huellaDigital);
-            comando.Parameters.AddWithValue("@dtValidoDesde", validoDesde.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@dtValidoHasta", validoHasta.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCertificado", idCertificado);
+            comando.Parameters.AddWithValue("@p_vchRutaAlmacenamiento", rutaAlmacenamiento);
+            comando.Parameters.AddWithValue("@p_vchSujeto", sujeto);
+            comando.Parameters.AddWithValue("@p_vchEmisor", emisor);
+            comando.Parameters.AddWithValue("@p_vchNumeroSerie", numeroSerie);
+            comando.Parameters.AddWithValue("@p_vchHuellaDigital", huellaDigital);
+            comando.Parameters.AddWithValue("@p_dtValidoDesde", validoDesde.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_dtValidoHasta", validoHasta.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -200,12 +200,12 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Certificado_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Certificado_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCertificado", idCertificado);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCertificado", idCertificado);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -229,7 +229,7 @@ public sealed class CertificadoRepositorioSql(IConfiguration configuracion) : IC
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

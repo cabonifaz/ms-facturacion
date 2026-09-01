@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -18,17 +18,17 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_TransmisionSunat_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_TransmisionSunat_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", (object?)transmision.IdDocumentoElectronico ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@intIdLoteDocumento", (object?)transmision.IdLoteDocumento ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchTipoProveedorCodigo", transmision.TipoProveedorCodigo);
-            comando.Parameters.AddWithValue("@vchEndpoint", transmision.Endpoint);
-            comando.Parameters.AddWithValue("@vchMetodo", transmision.Metodo);
-            comando.Parameters.AddWithValue("@intNumeroIntento", transmision.NumeroIntento);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", (object?)transmision.IdDocumentoElectronico ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_intIdLoteDocumento", (object?)transmision.IdLoteDocumento ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchTipoProveedorCodigo", transmision.TipoProveedorCodigo);
+            comando.Parameters.AddWithValue("@p_vchEndpoint", transmision.Endpoint);
+            comando.Parameters.AddWithValue("@p_vchMetodo", transmision.Metodo);
+            comando.Parameters.AddWithValue("@p_intNumeroIntento", transmision.NumeroIntento);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -57,17 +57,17 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_TransmisionSunat_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_TransmisionSunat_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdTransmisionSunat", idTransmisionSunat);
-            comando.Parameters.AddWithValue("@intEstadoCodigo", (int)resultado.EstadoCodigo);
-            comando.Parameters.AddWithValue("@vchSunatCodigoEstado", (object?)resultado.SunatCodigoEstado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatMensajeEstado", (object?)resultado.SunatMensajeEstado ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchTipoError", (object?)resultado.TipoError ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchMensajeError", (object?)resultado.MensajeError ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdTransmisionSunat", idTransmisionSunat);
+            comando.Parameters.AddWithValue("@p_intEstadoCodigo", (int)resultado.EstadoCodigo);
+            comando.Parameters.AddWithValue("@p_vchSunatCodigoEstado", (object?)resultado.SunatCodigoEstado ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatMensajeEstado", (object?)resultado.SunatMensajeEstado ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchTipoError", (object?)resultado.TipoError ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchMensajeError", (object?)resultado.MensajeError ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -91,7 +91,7 @@ public sealed class TransmisionSunatRepositorioSql(IConfiguration configuracion)
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

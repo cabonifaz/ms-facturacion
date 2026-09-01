@@ -26,6 +26,7 @@ Hexagonal (Ports & Adapters) / Clean Architecture, expressed with modern .NET 10
 
 ## Database Access
 
+- **Being migrated to MySQL** — the persistence Adaptadores are being ported from `Microsoft.Data.SqlClient` to `MySqlConnector`; the rest of this section still describes the SQL Server-era setup until that migration is complete.
 - SQL Server is the only supported database.
 - All database access goes through **stored procedures** — never write plain/inline SQL in C# (no `SELECT`, `INSERT`, `UPDATE`, `DELETE` statements in code).
 - Every query or command is a stored procedure call, e.g. `EXEC SP_ObtenerFactura`, `EXEC SP_InsertarFactura`, executed with `CommandType.StoredProcedure` (ADO.NET `SqlCommand`/`Microsoft.Data.SqlClient`). If EF Core is used, only via mapped stored-procedure calls (`FromSqlRaw("EXEC SP_...")`/`ExecuteSqlRaw`) — never `DbSet` LINQ queries that generate ad-hoc SQL.

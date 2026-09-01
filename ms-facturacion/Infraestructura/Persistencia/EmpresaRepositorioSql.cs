@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -20,21 +20,21 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Empresa_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Empresa_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@chrRuc", ruc);
-            comando.Parameters.AddWithValue("@vchRazonSocial", razonSocial);
-            comando.Parameters.AddWithValue("@vchNombreComercial", (object?)nombreComercial ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchDireccion", direccion);
-            comando.Parameters.AddWithValue("@chrUbigeo", ubigeo);
-            comando.Parameters.AddWithValue("@vchDepartamento", departamento);
-            comando.Parameters.AddWithValue("@vchProvincia", provincia);
-            comando.Parameters.AddWithValue("@vchDistrito", distrito);
-            comando.Parameters.AddWithValue("@intPaisCodigo", paisCodigo);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_chrRuc", ruc);
+            comando.Parameters.AddWithValue("@p_vchRazonSocial", razonSocial);
+            comando.Parameters.AddWithValue("@p_vchNombreComercial", (object?)nombreComercial ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchDireccion", direccion);
+            comando.Parameters.AddWithValue("@p_chrUbigeo", ubigeo);
+            comando.Parameters.AddWithValue("@p_vchDepartamento", departamento);
+            comando.Parameters.AddWithValue("@p_vchProvincia", provincia);
+            comando.Parameters.AddWithValue("@p_vchDistrito", distrito);
+            comando.Parameters.AddWithValue("@p_intPaisCodigo", paisCodigo);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -61,11 +61,11 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Empresa_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Empresa_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -110,13 +110,13 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Empresa_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Empresa_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@vchBusqueda", (object?)busqueda ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@numPag", numeroPagina);
-            comando.Parameters.AddWithValue("@intTamPag", tamanoPagina);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_vchBusqueda", (object?)busqueda ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_numPag", numeroPagina);
+            comando.Parameters.AddWithValue("@p_intTamPag", tamanoPagina);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -160,22 +160,22 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Empresa_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Empresa_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@chrRuc", ruc);
-            comando.Parameters.AddWithValue("@vchRazonSocial", razonSocial);
-            comando.Parameters.AddWithValue("@vchNombreComercial", (object?)nombreComercial ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchDireccion", direccion);
-            comando.Parameters.AddWithValue("@chrUbigeo", ubigeo);
-            comando.Parameters.AddWithValue("@vchDepartamento", departamento);
-            comando.Parameters.AddWithValue("@vchProvincia", provincia);
-            comando.Parameters.AddWithValue("@vchDistrito", distrito);
-            comando.Parameters.AddWithValue("@intPaisCodigo", paisCodigo);
-            comando.Parameters.AddWithValue("@bitActivo", activo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_chrRuc", ruc);
+            comando.Parameters.AddWithValue("@p_vchRazonSocial", razonSocial);
+            comando.Parameters.AddWithValue("@p_vchNombreComercial", (object?)nombreComercial ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchDireccion", direccion);
+            comando.Parameters.AddWithValue("@p_chrUbigeo", ubigeo);
+            comando.Parameters.AddWithValue("@p_vchDepartamento", departamento);
+            comando.Parameters.AddWithValue("@p_vchProvincia", provincia);
+            comando.Parameters.AddWithValue("@p_vchDistrito", distrito);
+            comando.Parameters.AddWithValue("@p_intPaisCodigo", paisCodigo);
+            comando.Parameters.AddWithValue("@p_bitActivo", activo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -203,12 +203,12 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_Empresa_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_Empresa_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -232,7 +232,7 @@ public sealed class EmpresaRepositorioSql(IConfiguration configuracion) : IEmpre
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

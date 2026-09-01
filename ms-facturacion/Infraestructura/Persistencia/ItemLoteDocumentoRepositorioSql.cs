@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -19,15 +19,15 @@ public sealed class ItemLoteDocumentoRepositorioSql(IConfiguration configuracion
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ItemLoteDocumento_ActualizarEstadoSunatTodos", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ItemLoteDocumento_ActualizarEstadoSunatTodos", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdLoteDocumento", idLoteDocumento);
-            comando.Parameters.AddWithValue("@intEstadoItemCodigo", (int)estadoItemCodigo);
-            comando.Parameters.AddWithValue("@vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdLoteDocumento", idLoteDocumento);
+            comando.Parameters.AddWithValue("@p_intEstadoItemCodigo", (int)estadoItemCodigo);
+            comando.Parameters.AddWithValue("@p_vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -51,7 +51,7 @@ public sealed class ItemLoteDocumentoRepositorioSql(IConfiguration configuracion
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

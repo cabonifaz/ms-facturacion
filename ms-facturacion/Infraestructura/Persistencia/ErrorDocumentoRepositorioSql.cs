@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -18,18 +18,18 @@ public sealed class ErrorDocumentoRepositorioSql(IConfiguration configuracion) :
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ErrorDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ErrorDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", error.IdDocumentoElectronico);
-            comando.Parameters.AddWithValue("@intIdTransmisionSunat", (object?)error.IdTransmisionSunat ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchOrigenErrorCodigo", error.OrigenErrorCodigo);
-            comando.Parameters.AddWithValue("@vchCodigoError", error.CodigoError);
-            comando.Parameters.AddWithValue("@vchMensajeError", error.MensajeError);
-            comando.Parameters.AddWithValue("@vchCampo", (object?)error.Campo ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSeveridadCodigo", error.SeveridadCodigo);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", error.IdDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdTransmisionSunat", (object?)error.IdTransmisionSunat ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchOrigenErrorCodigo", error.OrigenErrorCodigo);
+            comando.Parameters.AddWithValue("@p_vchCodigoError", error.CodigoError);
+            comando.Parameters.AddWithValue("@p_vchMensajeError", error.MensajeError);
+            comando.Parameters.AddWithValue("@p_vchCampo", (object?)error.Campo ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSeveridadCodigo", error.SeveridadCodigo);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -57,11 +57,11 @@ public sealed class ErrorDocumentoRepositorioSql(IConfiguration configuracion) :
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_ErrorDocumento_ListarUltimoEnvio", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_ErrorDocumento_ListarUltimoEnvio", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -95,7 +95,7 @@ public sealed class ErrorDocumentoRepositorioSql(IConfiguration configuracion) :
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

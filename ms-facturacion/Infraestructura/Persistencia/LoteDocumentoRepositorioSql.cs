@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -19,26 +19,17 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
-            var tabla = new DataTable();
-            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
-            tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var item in items)
-            {
-                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
-            }
-
-            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
-            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
-            tvpItems.Value = tabla;
+            var jsonItems = items.Select(item => new { item.IdDocumentoElectronico, item.MotivoDescripcion });
+            comando.Parameters.AddWithValue("@p_jsonItems", System.Text.Json.JsonSerializer.Serialize(jsonItems));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -72,26 +63,17 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_PrevisualizarBaja", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_PrevisualizarBaja", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
             // MotivoDescripcion es NOT NULL en TVP_ITEM_LOTE_DOCUMENTO_BAJA (mismo tipo que InsertarAsync),
             // pero SP_LoteDocumento_PrevisualizarBaja nunca lo lee — placeholder solo para cumplir el shape.
-            var tabla = new DataTable();
-            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
-            tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var id in idsDocumentoElectronico)
-            {
-                tabla.Rows.Add(id, string.Empty);
-            }
-
-            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
-            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
-            tvpItems.Value = tabla;
+            var jsonItems = idsDocumentoElectronico.Select(id => new { IdDocumentoElectronico = id, MotivoDescripcion = string.Empty });
+            comando.Parameters.AddWithValue("@p_jsonItems", System.Text.Json.JsonSerializer.Serialize(jsonItems));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -129,26 +111,17 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteResumenBajaBoleta_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteResumenBajaBoleta_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
-            var tabla = new DataTable();
-            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
-            tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var item in items)
-            {
-                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
-            }
-
-            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
-            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
-            tvpItems.Value = tabla;
+            var jsonItems = items.Select(item => new { item.IdDocumentoElectronico, item.MotivoDescripcion });
+            comando.Parameters.AddWithValue("@p_jsonItems", System.Text.Json.JsonSerializer.Serialize(jsonItems));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -182,24 +155,15 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteResumenBajaBoleta_PrevisualizarBaja", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteResumenBajaBoleta_PrevisualizarBaja", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaGeneracion", fechaGeneracion.ToDateTime(TimeOnly.MinValue));
 
-            var tabla = new DataTable();
-            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
-            tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var id in idsDocumentoElectronico)
-            {
-                tabla.Rows.Add(id, string.Empty);
-            }
-
-            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
-            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
-            tvpItems.Value = tabla;
+            var jsonItems = idsDocumentoElectronico.Select(id => new { IdDocumentoElectronico = id, MotivoDescripcion = string.Empty });
+            comando.Parameters.AddWithValue("@p_jsonItems", System.Text.Json.JsonSerializer.Serialize(jsonItems));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -237,26 +201,17 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_InsertarManual", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_InsertarManual", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdEmpresa", idEmpresa);
-            comando.Parameters.AddWithValue("@dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
-            comando.Parameters.AddWithValue("@dtFechaGeneracion", fechaGeneracion);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdEmpresa", idEmpresa);
+            comando.Parameters.AddWithValue("@p_dtFechaReferencia", fechaReferencia.ToDateTime(TimeOnly.MinValue));
+            comando.Parameters.AddWithValue("@p_dtFechaGeneracion", fechaGeneracion);
 
-            var tabla = new DataTable();
-            tabla.Columns.Add("IdDocumentoElectronico", typeof(int));
-            tabla.Columns.Add("MotivoDescripcion", typeof(string));
-            foreach (var item in items)
-            {
-                tabla.Rows.Add(item.IdDocumentoElectronico, item.MotivoDescripcion);
-            }
-
-            var tvpItems = comando.Parameters.Add("@tvpItems", SqlDbType.Structured);
-            tvpItems.TypeName = "dbo.TVP_ITEM_LOTE_DOCUMENTO_BAJA";
-            tvpItems.Value = tabla;
+            var jsonItems = items.Select(item => new { item.IdDocumentoElectronico, item.MotivoDescripcion });
+            comando.Parameters.AddWithValue("@p_jsonItems", System.Text.Json.JsonSerializer.Serialize(jsonItems));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -289,11 +244,11 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_Obtener", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdLoteDocumento", idLoteDocumento);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdLoteDocumento", idLoteDocumento);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -352,16 +307,16 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_ActualizarEstadoSunat", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_ActualizarEstadoSunat", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdLoteDocumento", idLoteDocumento);
-            comando.Parameters.AddWithValue("@intEstadoCodigo", (int)estadoCodigo);
-            comando.Parameters.AddWithValue("@vchTicket", (object?)ticket ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
-            comando.Parameters.AddWithValue("@vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdLoteDocumento", idLoteDocumento);
+            comando.Parameters.AddWithValue("@p_intEstadoCodigo", (int)estadoCodigo);
+            comando.Parameters.AddWithValue("@p_vchTicket", (object?)ticket ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatCodigoRespuesta", (object?)sunatCodigoRespuesta ?? DBNull.Value);
+            comando.Parameters.AddWithValue("@p_vchSunatDescripcionRespuesta", (object?)sunatDescripcionRespuesta ?? DBNull.Value);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -388,8 +343,8 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_LoteDocumento_ListarPendientesTicket", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_LoteDocumento_ListarPendientesTicket", conexion) { CommandType = CommandType.StoredProcedure };
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -419,14 +374,14 @@ public sealed class LoteDocumentoRepositorioSql(IConfiguration configuracion) : 
         }
     }
 
-    private static string? LeerNullableString(SqlDataReader lector, string columna)
+    private static string? LeerNullableString(MySqlDataReader lector, string columna)
     {
         var ordinal = lector.GetOrdinal(columna);
         return lector.IsDBNull(ordinal) ? null : lector.GetString(ordinal);
     }
 
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {

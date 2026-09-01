@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using System.Data;
 using ms_facturacion.Aplicacion.Comun;
 using ms_facturacion.Aplicacion.Puertos;
@@ -19,13 +19,13 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CampoExtraDocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CampoExtraDocumentoElectronico_Insertar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchTexto", campo.Texto);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchTexto", campo.Texto);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -54,16 +54,15 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CampoExtraDocumentoElectronico_InsertarLote", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CampoExtraDocumentoElectronico_InsertarLote", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
-            var tvpCamposExtra = comando.Parameters.Add("@tvpCamposExtra", SqlDbType.Structured);
-            tvpCamposExtra.TypeName = "dbo.TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO";
-            tvpCamposExtra.Value = ConstruirTablaCamposExtra(camposExtra);
+            var jsonCamposExtra = camposExtra.Select(campo => new { campo.Texto });
+            comando.Parameters.AddWithValue("@p_jsonCamposExtra", System.Text.Json.JsonSerializer.Serialize(jsonCamposExtra));
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -94,11 +93,11 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CampoExtraDocumentoElectronico_Listar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CampoExtraDocumentoElectronico_Listar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdDocumentoElectronico", idDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdDocumentoElectronico", idDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -132,13 +131,13 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CampoExtraDocumentoElectronico_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CampoExtraDocumentoElectronico_Actualizar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCampoExtraDocumentoElectronico", idCampoExtraDocumentoElectronico);
-            comando.Parameters.AddWithValue("@vchTexto", campo.Texto);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCampoExtraDocumentoElectronico", idCampoExtraDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchTexto", campo.Texto);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -166,12 +165,12 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
     {
         try
         {
-            await using var conexion = new SqlConnection(CadenaConexion);
-            await using var comando = new SqlCommand("SP_CampoExtraDocumentoElectronico_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
+            await using var conexion = new MySqlConnection(CadenaConexion);
+            await using var comando = new MySqlCommand("SP_CampoExtraDocumentoElectronico_Eliminar", conexion) { CommandType = CommandType.StoredProcedure };
 
-            comando.Parameters.AddWithValue("@vchUsuarioEjecutor", usuarioEjecutor);
-            comando.Parameters.AddWithValue("@intIdInquilino", idInquilino);
-            comando.Parameters.AddWithValue("@intIdCampoExtraDocumentoElectronico", idCampoExtraDocumentoElectronico);
+            comando.Parameters.AddWithValue("@p_vchUsuarioEjecutor", usuarioEjecutor);
+            comando.Parameters.AddWithValue("@p_intIdInquilino", idInquilino);
+            comando.Parameters.AddWithValue("@p_intIdCampoExtraDocumentoElectronico", idCampoExtraDocumentoElectronico);
 
             await conexion.OpenAsync(cancellationToken);
             await using var lector = await comando.ExecuteReaderAsync(cancellationToken);
@@ -194,23 +193,8 @@ public sealed class CampoExtraDocumentoElectronicoRepositorioSql(IConfiguration 
         }
     }
 
-    /// El orden de columnas debe coincidir exactamente con TVP_CAMPO_EXTRA_DOCUMENTO_ELECTRONICO
-    /// (02_CrearTipos_MsFacturacion.sql) — una TVP basada en DataTable se mapea posicionalmente, no por nombre.
-    private static DataTable ConstruirTablaCamposExtra(IReadOnlyList<CampoExtraEntrada> camposExtra)
-    {
-        var tabla = new DataTable();
-        tabla.Columns.Add("Texto", typeof(string));
-
-        foreach (var campo in camposExtra)
-        {
-            tabla.Rows.Add(campo.Texto);
-        }
-
-        return tabla;
-    }
-
     private static async Task<(TipoMensaje IdTipoMensaje, string Mensaje)> LeerCabeceraAsync(
-        SqlDataReader lector, CancellationToken cancellationToken)
+        MySqlDataReader lector, CancellationToken cancellationToken)
     {
         if (!await lector.ReadAsync(cancellationToken))
         {
