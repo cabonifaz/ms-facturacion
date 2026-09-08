@@ -53,6 +53,10 @@ public sealed class SunatBillServiceCliente(
 
             if (!respuesta.IsSuccessStatusCode)
             {
+                logger.LogError(
+                    "sendBill — SUNAT respondió con error HTTP {StatusCode}. Cuerpo completo: {CuerpoRespuesta}",
+                    (int)respuesta.StatusCode, cuerpoRespuesta);
+
                 var faultString = ExtraerFaultString(cuerpoRespuesta);
                 return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                     faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.");
