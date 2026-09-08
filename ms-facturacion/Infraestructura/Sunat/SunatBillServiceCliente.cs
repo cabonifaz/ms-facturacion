@@ -51,12 +51,12 @@ public sealed class SunatBillServiceCliente(
             using var respuesta = await httpClient.SendAsync(solicitud, cancellationToken);
             var cuerpoRespuesta = await respuesta.Content.ReadAsStringAsync(cancellationToken);
 
+            logger.LogError(
+                "sendBill — respuesta completa de SUNAT. StatusCode={StatusCode}. Headers={Headers}. Cuerpo={CuerpoRespuesta}",
+                (int)respuesta.StatusCode, $"{respuesta.Headers}{respuesta.Content.Headers}", cuerpoRespuesta);
+
             if (!respuesta.IsSuccessStatusCode)
             {
-                logger.LogError(
-                    "sendBill — SUNAT respondió con error HTTP {StatusCode}. Cuerpo completo: {CuerpoRespuesta}",
-                    (int)respuesta.StatusCode, cuerpoRespuesta);
-
                 var faultString = ExtraerFaultString(cuerpoRespuesta);
                 return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
                     faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.");
