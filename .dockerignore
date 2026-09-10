@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.git/
+.gitignore
+.claude/
+CLAUDE.md
+AGENTS.md
+**/appsettings.json
+**/appsettings.*.json
+!**/appsettings.Model.json
+**/*.user

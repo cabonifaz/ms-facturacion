@@ -28,6 +28,7 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
+builder.Services.AddHealthChecks();
 
 // AWS S3 — mismo patrón de conexión que maximlian3_backend/SafetyReport.WebApi/Program.cs:
 // credenciales estáticas (AWS:AccessKey/AWS:SecretKey) + región (AWS:Region), un solo IAmazonS3 singleton.
@@ -165,7 +166,11 @@ builder.Services.AddHostedService<ResolverTicketsComunicacionBajaWorker>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+// "Environment" viene de appsettings.json (no de ASPNETCORE_ENVIRONMENT), mismo patrón
+// que maximlian3_backend/SafetyReport.WebApi/Program.cs — el despliegue en Railway no
+// setea esa variable de entorno, así que cada appsettings.json por ambiente la trae fija.
+var esDevelopment = string.Equals(app.Configuration["Environment"], "Development", StringComparison.OrdinalIgnoreCase);
+if (esDevelopment)
 {
     app.MapOpenApi();
 
@@ -176,6 +181,9 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 }
 
 app.UseHttpsRedirection();
+
+// Antes del ApiKeyMiddleware: el healthcheck de infraestructura (Railway, balanceador) no envía X-Api-Key.
+app.MapHealthChecks("/health");
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
