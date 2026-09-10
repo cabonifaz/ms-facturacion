@@ -58,8 +58,25 @@ public sealed class SunatBillServiceCliente(
             if (!respuesta.IsSuccessStatusCode)
             {
                 var faultString = ExtraerFaultString(cuerpoRespuesta);
-                return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(
-                    faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.");
+                var mensaje = faultString ?? $"SUNAT respondió con error HTTP {(int)respuesta.StatusCode}.";
+
+                // X-Backside-Transport es un header que estampa el gateway (tipo IBM DataPower) delante del
+                // billService real de SUNAT. "FAIL" en cualquiera de sus dos valores significa que el gateway
+                // nunca llegó a alcanzar el backend real de SUNAT y fabricó el fault él mismo (visto en
+                // producción como faultstring="Internal Error" sin ningún detalle) — el ZIP jamás fue recibido
+                // por la aplicación de SUNAT, así que no es un hecho real sobre el documento (a diferencia de
+                // un fault con código/detalle real de SUNAT). Se trata como ErrorSistema: el caso de uso lo
+                // deja en PendienteEnvio para reintentar con el mismo Serie-Correlativo, en vez de quemarlo
+                // como ErrorSunat permanente.
+                if (EsFalloDeGateway(respuesta))
+                {
+                    // Mensaje propio en vez del faultString crudo de SUNAT ("Internal Error" no le dice nada
+                    // al usuario final) — el faultString real ya quedó en el log de arriba para diagnóstico.
+                    return ResultadoOperacion<ResultadoEnvioSunat>.DeErrorSistema(
+                        "SUNAT no pudo procesar el envío por un problema temporal de conexión. El documento no fue registrado; puede reintentar el envío en unos minutos.");
+                }
+
+                return ResultadoOperacion<ResultadoEnvioSunat>.DeReglaDeNegocio(mensaje);
             }
 
             return InterpretarRespuesta(cuerpoRespuesta);
@@ -184,6 +201,10 @@ public sealed class SunatBillServiceCliente(
         entradaStream.CopyTo(salida);
         return salida.ToArray();
     }
+
+    private static bool EsFalloDeGateway(HttpResponseMessage respuesta) =>
+        respuesta.Headers.TryGetValues("X-Backside-Transport", out var valores)
+        && valores.Any(v => v.Contains("FAIL", StringComparison.OrdinalIgnoreCase));
 
     private static string? ExtraerFaultString(string cuerpoRespuesta)
     {
